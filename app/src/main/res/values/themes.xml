@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Platform theme used only while the process starts. On Android 12+ the
+        system splash screen uses windowBackground and the launcher icon.
+        All in-app styling comes from Compose (core/design/theme).
+    -->
+    <style name="Theme.NexusNotes" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

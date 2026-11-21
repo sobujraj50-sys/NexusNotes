@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Original Nexus Notes mark: a folded note sheet with an "N" stroke. 108dp adaptive canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#8B5CF6"
+        android:pathData="M40,32 H62 L74,44 V72 Q74,76 70,76 H40 Q36,76 36,72 V36 Q36,32 40,32 Z" />
+    <path
+        android:fillColor="#22D3EE"
+        android:pathData="M62,32 V41 Q62,44 65,44 H74 Z" />
+    <path
+        android:strokeColor="#F8FAFC"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M46,67 V49 L61,67 V49" />
+</vector>
