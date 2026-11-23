@@ -1,10 +1,14 @@
-# Version catalog — Milestone 1.
+# Version catalog — Milestone 2.
 # Versions checked against developer.android.com / kotlinlang.org on 2026-11-21.
 # See docs/ARCHITECTURE.md §3 for the verification notes on each entry.
 
 [versions]
 agp = "9.2.1"
 kotlin = "2.3.20"
+# KSP 2.3.x is independent of the Kotlin version; 2.3.1+ supports AGP 9 built-in Kotlin.
+ksp = "2.3.12"
+room = "2.8.5"
+datastore = "1.3.0"
 composeBom = "2026.08.00"
 coreKtx = "1.19.1"
 activityCompose = "1.13.0"
@@ -21,6 +25,12 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-savedstate = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-savedstate", version.ref = "lifecycle" }
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
@@ -40,3 +50,4 @@ androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espres
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

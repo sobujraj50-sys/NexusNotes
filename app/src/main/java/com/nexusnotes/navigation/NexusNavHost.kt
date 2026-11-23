@@ -39,6 +39,7 @@ fun NexusNavHost(
 ) {
     val navigate: (String) -> Unit = { route -> navController.navigate(route) { launchSingleTop = true } }
     val back: () -> Unit = { navController.navigateUp() }
+    val openNote: (String) -> Unit = { id -> navigate(NexusDestination.NoteEditor.createRoute(id)) }
 
     NavHost(
         navController = navController,
@@ -61,7 +62,9 @@ fun NexusNavHost(
         composable(NexusDestination.Settings.route) { SettingsScreen(onNavigate = navigate) }
 
         // Notes
-        composable(NexusDestination.AllNotes.route) { AllNotesScreen(onNavigate = navigate, onBack = back) }
+        composable(NexusDestination.AllNotes.route) {
+            AllNotesScreen(onOpenNote = openNote, onNavigate = navigate, onBack = back)
+        }
         composable(
             route = NexusDestination.NoteEditor.route,
             arguments = listOf(
@@ -71,12 +74,20 @@ fun NexusNavHost(
                     defaultValue = null
                 },
             ),
-        ) { entry ->
-            NoteEditorScreen(noteId = entry.arguments?.getString(ARG_NOTE_ID), onBack = back)
+        ) {
+            NoteEditorScreen(
+                onBack = back,
+                onOpenNote = { id ->
+                    // Replace the current editor with the duplicate.
+                    navController.navigate(NexusDestination.NoteEditor.createRoute(id)) {
+                        popUpTo(NexusDestination.NoteEditor.route) { inclusive = true }
+                    }
+                },
+            )
         }
-        composable(NexusDestination.Favorites.route) { FavoritesScreen(onBack = back) }
-        composable(NexusDestination.Archive.route) { ArchiveScreen(onBack = back) }
-        composable(NexusDestination.Trash.route) { TrashScreen(onBack = back) }
+        composable(NexusDestination.Favorites.route) { FavoritesScreen(onOpenNote = openNote, onBack = back) }
+        composable(NexusDestination.Archive.route) { ArchiveScreen(onOpenNote = openNote, onBack = back) }
+        composable(NexusDestination.Trash.route) { TrashScreen(onOpenNote = openNote, onBack = back) }
 
         // Organization
         composable(
@@ -85,6 +96,7 @@ fun NexusNavHost(
         ) { entry ->
             FolderDetailScreen(
                 folderId = entry.arguments?.getString(ARG_FOLDER_ID).orEmpty(),
+                onOpenNote = openNote,
                 onNavigate = navigate,
                 onBack = back,
             )

@@ -31,7 +31,7 @@ Main risks: (1) rich-text expectations — mitigated by the Markdown-first model
   - `domain/` — plain Kotlin models and the few use cases with real logic (template substitution, folder-cycle check, backup validation). No use case classes that only forward calls.
   - `feature/` — Compose screens + ViewModels.
   - `core/` — design system, security, database setup, shared utilities.
-- **Hilt** for DI from Milestone 2 (nothing to inject in M1).
+- **Manual dependency injection** through `AppContainer` (decided in M2). Hilt was dropped: its Gradle plugin is the riskiest piece on AGP 9 and the dependency graph is small. Revisit if the graph grows.
 - **Coroutines + Flow** everywhere; Room queries return `Flow`; writes are `suspend` on `Dispatchers.IO` (Room does this automatically for suspend DAOs).
 - **Navigation Compose with string routes** (no serialization plugin needed). IDs in routes are UUID strings.
 
@@ -56,7 +56,9 @@ Checked against official release pages on 2026-11-21.
 
 **Needs confirming on your machine:** the AndroidX numbers came from a summarized read of the versions page. If Gradle sync reports "Could not find …", change only that line in `gradle/libs.versions.toml` to the version shown on its release page.
 
-**Added in later milestones (versions verified when added):** Room + KSP (M2), Hilt (M2), DataStore (M2), WorkManager (M8/M9), Biometric (M7), a Markdown renderer (M3).
+**Added in Milestone 2:** Room 2.8.5 (+ room-ktx, compiler via KSP 2.3.12), DataStore Preferences 1.3.0, lifecycle-viewmodel-compose/savedstate 2.11.1.
+
+**Added in later milestones (versions verified when added):** WorkManager (M8/M9), Biometric (M7), a Markdown renderer (M3).
 
 ## 4. Directory structure
 
@@ -104,7 +106,7 @@ Room database `nexus.db`, `exportSchema = true`, schemas committed under `app/sc
 
 | Entity | Key columns | Relations / constraints |
 |---|---|---|
-| NoteEntity | id, title, body (Markdown), bodyFormatVersion, folderId?, colorIndex?, isPinned, isFavorite, isArchived, deletedAt?, createdAt, updatedAt | FK folderId → Folder (SET NULL). Indexes: folderId, updatedAt, (isArchived, deletedAt). Trash = `deletedAt IS NOT NULL` (soft delete). |
+| NoteEntity (**v1, built in M2**) | id, title, body (Markdown), bodyFormatVersion, folderId? (added in M4), colorIndex?, isPinned, isFavorite, isArchived, deletedAt?, createdAt, updatedAt | FK folderId → Folder (SET NULL). Indexes: folderId, updatedAt, (isArchived, deletedAt). Trash = `deletedAt IS NOT NULL` (soft delete). |
 | NoteFtsEntity | title, body | `@Fts4(contentEntity = NoteEntity)`; Room creates sync triggers. Vault notes are never in NoteEntity, so never indexed. |
 | FolderEntity | id, name, parentId?, colorIndex?, sortOrder, createdAt | FK parentId → Folder (CASCADE on delete is NOT used; deleting a folder moves its notes to Unfiled after confirmation). Cycle check in domain before every move. Unique (parentId, name). |
 | TagEntity | id, name | Unique name (case-insensitive, `COLLATE NOCASE`). |

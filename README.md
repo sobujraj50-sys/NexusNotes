@@ -2,7 +2,12 @@
 
 Offline-first, private notes, knowledge and AI-prompt library for Android. Kotlin · Jetpack Compose · Material 3.
 
-**Current state: Milestone 1 of 10** — design system, navigation and all screens as shells. No data is stored yet. See `docs/ROADMAP.md`.
+**Current state: Milestone 2 of 10** — notes are saved on the phone (autosave, pin, favorites, archive, trash, colors, sorting, undo/redo). See `docs/ROADMAP.md`.
+
+## Build with GitHub (no Android Studio needed)
+1. Upload the project ZIP with **Add file › Upload files** in the repository root.
+2. GitHub Actions unpacks it, runs the unit tests, builds a signed APK and publishes it under **Releases**.
+3. Requires the repository secrets `KEYSTORE_BASE64` and `KEYSTORE_PASSWORD` so every APK is signed with the same key and installs as an update.
 
 ## Requirements
 - Android Studio, latest stable release (it must support AGP 9.2; if it does not, update Studio first)

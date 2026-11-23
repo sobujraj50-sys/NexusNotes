@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -28,7 +29,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +40,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nexusnotes.core.common.greetingForHour
 import com.nexusnotes.core.design.components.InlineEmpty
 import com.nexusnotes.core.design.components.NexusScreen
@@ -45,6 +50,7 @@ import com.nexusnotes.core.design.components.SectionHeader
 import com.nexusnotes.core.design.icons.NexusIcons
 import com.nexusnotes.core.design.theme.spacing
 import com.nexusnotes.domain.model.PromptCategory
+import com.nexusnotes.feature.notes.NoteCard
 import com.nexusnotes.navigation.NexusDestination
 import java.time.LocalTime
 
@@ -55,8 +61,11 @@ fun HomeScreen(
     onNavigate: (String) -> Unit,
     onOpenPrompts: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val spacing = MaterialTheme.spacing
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val openNote: (String) -> Unit = { id -> onNavigate(NexusDestination.NoteEditor.createRoute(id)) }
     val greeting = remember { greetingForHour(LocalTime.now().hour) }
 
     NexusScreen(
@@ -129,19 +138,30 @@ fun HomeScreen(
                 }
             }
             item(key = "prompt_card") { PromptLibraryCard(onClick = onOpenPrompts) }
-            item(key = "pinned") {
-                DashboardSection("Pinned") {
-                    InlineEmpty(NexusIcons.Pin, "Pinned notes stay at the top here.", milestone = 2)
+            if (!state.isLoading && state.pinned.isNotEmpty()) {
+                item(key = "pinned_header") { SectionHeader("Pinned") }
+                items(state.pinned, key = { "pinned_" + it.id }) { note ->
+                    NoteCard(note = note, onClick = { openNote(note.id) })
                 }
             }
-            item(key = "recent") {
-                DashboardSection("Recent notes") {
-                    InlineEmpty(NexusIcons.History, "No notes yet. Notes you edit appear here.", milestone = 2)
+            item(key = "recent_header") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionHeader("Recent notes", Modifier.weight(1f))
+                    TextButton(onClick = { onNavigate(NexusDestination.AllNotes.route) }) { Text("See all") }
                 }
             }
-            item(key = "favorites") {
-                DashboardSection("Favorites") {
-                    InlineEmpty(Icons.Filled.Star, "Star a note to keep it close.", milestone = 2)
+            if (!state.isLoading && state.recent.isEmpty() && state.pinned.isEmpty()) {
+                item(key = "recent_empty") {
+                    InlineEmpty(NexusIcons.History, "No notes yet. Tap Quick note to write your first one.")
+                }
+            }
+            items(state.recent, key = { "recent_" + it.id }) { note ->
+                NoteCard(note = note, onClick = { openNote(note.id) })
+            }
+            if (!state.isLoading && state.favorites.isNotEmpty()) {
+                item(key = "favorites_header") { SectionHeader("Favorites") }
+                items(state.favorites, key = { "fav_" + it.id }) { note ->
+                    NoteCard(note = note, onClick = { openNote(note.id) })
                 }
             }
             item(key = "collections") {

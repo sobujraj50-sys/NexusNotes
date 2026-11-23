@@ -21,6 +21,7 @@ import com.nexusnotes.core.design.components.PlannedFeatureCard
 import com.nexusnotes.core.design.components.SectionHeader
 import com.nexusnotes.core.design.icons.NexusIcons
 import com.nexusnotes.core.design.theme.spacing
+import com.nexusnotes.feature.notes.AllNotesScreen
 import com.nexusnotes.navigation.NexusDestination
 import com.nexusnotes.navigation.UNFILED_FOLDER_ID
 
@@ -84,33 +85,22 @@ fun FoldersScreen(onNavigate: (String) -> Unit) {
 @Composable
 fun FolderDetailScreen(
     folderId: String,
+    onOpenNote: (String) -> Unit,
     onNavigate: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    val isUnfiled = folderId == UNFILED_FOLDER_ID
-    NexusScreen(
-        title = if (isUnfiled) "Unfiled" else NexusDestination.FolderDetail.title,
-        onBack = onBack,
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { onNavigate(NexusDestination.NoteEditor.createRoute()) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "New note")
-            }
-        },
-    ) { padding ->
+    if (folderId == UNFILED_FOLDER_ID) {
+        // Folders arrive in Milestone 4; until then every note is unfiled.
+        AllNotesScreen(onOpenNote = onOpenNote, onNavigate = onNavigate, onBack = onBack, title = "Unfiled")
+        return
+    }
+    NexusScreen(title = NexusDestination.FolderDetail.title, onBack = onBack) { padding ->
         CenteredEmptyState(
             padding = padding,
             icon = NexusIcons.Folder,
-            title = "No notes here",
-            message = if (isUnfiled) {
-                "Notes without a folder will be listed here once notes can be saved."
-            } else {
-                "This folder has no notes yet."
-            },
-            milestone = 2,
+            title = "Folder not found",
+            message = "Folders can be created from Milestone 4.",
+            milestone = 4,
         )
     }
 }

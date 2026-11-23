@@ -5,7 +5,7 @@ Each milestone ends with a buildable APK, its tests, and a stop for your approva
 | # | Milestone | Main deliverables | Exit criteria |
 |---|---|---|---|
 | 1 | Foundation | Gradle project, design system, theme (dark/light), bottom nav + 18 screens as honest shells, unit + UI tests | Debug APK installs; all screens reachable; tests pass on your device |
-| 2 | Database + note CRUD | Room DB, Hilt, DataStore; NoteEntity; create/edit/autosave (debounced), pin, favorite, archive, trash/restore, permanent delete with confirm, duplicate, color labels, sorting, recent, word count, undo/redo; theme setting | Notes survive app kill and device restart; schema exported |
+| 2 | Database + note CRUD | Room DB, DataStore, manual DI; NoteEntity; create/edit/autosave (debounced), pin, favorite, archive, trash/restore, permanent delete with confirm, duplicate, color labels, sorting, recent, word count, undo/redo; theme setting | Notes survive app kill and device restart; schema exported |
 | 3 | Editor | Markdown-first editor: toolbar inserting syntax (bold, italic, underline ext., strike, headings, lists, checklists, quotes, links, code, tables), live preview, find-in-note, focus mode; content format version 1 documented | Round-trip tests: save → reload is byte-identical; cursor/selection tests |
 | 4 | Organization + search | Folders (nested, colors, cycle prevention), tags (many-to-many), filters, FTS4 search with highlights, suggestions, optional history | Folder-cycle and FTS-sync tests; search over 10k notes < 200 ms on device |
 | 5 | Prompt Library | Prompts, categories, favorites, copy, duplicate, version history, `{{variable}}` engine, Template Runner, JSON import/export | Substitution engine fully unit-tested; source template never modified |
