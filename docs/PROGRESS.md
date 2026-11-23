@@ -21,3 +21,5 @@
 - M3: Markdown is the single stored format (Nexus Markdown v1); own parser/formatter instead of a library.
 - M4: add-only migration; pre-upgrade DB copy; folders without SQL FK (integrity in DAO transactions); FTS4 external content; search history off by default.
 - M5: own template engine (single-pass, never mutates source) and strict JSON codec; prompt history coalesced per 5 min, 30 kept.
+- 2026-11-24: Fixed crash opening Prompt Library — `{{variable}}` regex had an unescaped `}}`; Android's ICU regex rejects it (JVM accepts). All braces now escaped. Lesson: JVM tests cannot catch ICU-only regex errors; keep braces/brackets escaped in every pattern.
+- 2026-11-24: Signing fixed — KEYSTORE_BASE64 secret had never been added (every build used a throwaway debug key, forcing uninstalls). Local crash reporter added (0.5.1).

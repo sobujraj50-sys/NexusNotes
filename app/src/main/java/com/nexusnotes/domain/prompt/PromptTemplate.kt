@@ -14,7 +14,8 @@ package com.nexusnotes.domain.prompt
  */
 object PromptTemplate {
 
-    private val variableRegex = Regex("""(\\)?\{\{\s*([\p{L}_][\p{L}\p{M}\p{N}_]*)\s*}}""")
+    // Every brace is escaped: Android's regex engine (ICU) rejects a bare "}" that Java accepts.
+    private val variableRegex = Regex("""(\\)?\{\{\s*([\p{L}_][\p{L}\p{M}\p{N}_]*)\s*\}\}""")
 
     data class Token(val name: String, val range: IntRange)
 

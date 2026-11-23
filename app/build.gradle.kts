@@ -23,7 +23,7 @@ android {
         targetSdk = 36
         // CI passes -PversionCode=<run number> so every build is a valid update.
         versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-        versionName = "0.5.1-m5"
+        versionName = "0.5.2-m5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
