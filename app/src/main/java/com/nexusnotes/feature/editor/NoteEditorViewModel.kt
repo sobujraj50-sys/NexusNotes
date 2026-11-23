@@ -13,6 +13,9 @@ import com.nexusnotes.core.common.Clock
 import com.nexusnotes.data.repository.NoteRepository
 import com.nexusnotes.domain.EditHistory
 import com.nexusnotes.domain.EditorSnapshot
+import com.nexusnotes.domain.markdown.FormatAction
+import com.nexusnotes.domain.markdown.MarkdownFormatter
+import com.nexusnotes.domain.markdown.TextEdit
 import com.nexusnotes.domain.model.Note
 import com.nexusnotes.domain.model.SaveOutcome
 import com.nexusnotes.navigation.ARG_NOTE_ID
@@ -125,8 +128,43 @@ class NoteEditorViewModel(
     fun onBodyChange(value: TextFieldValue) {
         val old = _uiState.value
         if (old.isLoading || old.isReadOnly) return
-        _uiState.update { it.copy(body = value) }
-        if (value.text != old.body.text) onTextEdited()
+        // Pressing Enter inside a list continues the list (or ends it on an empty item).
+        val continued = MarkdownFormatter.continueListOnEnter(old.body.toEdit(), value.toEdit())
+        val newValue = continued?.toFieldValue() ?: value
+        _uiState.update { it.copy(body = newValue) }
+        if (newValue.text != old.body.text) onTextEdited()
+    }
+
+    /** Applies a formatting toolbar action to the body at its current selection. */
+    fun format(action: FormatAction) {
+        val state = _uiState.value
+        if (state.isLoading || state.isReadOnly) return
+        val result = MarkdownFormatter.apply(state.body.toEdit(), action)
+        _uiState.update { it.copy(body = result.toFieldValue()) }
+        if (result.text != state.body.text) onTextEdited()
+    }
+
+    /** Toggles a checklist item from the preview. [sourceLine] is the 0-based line in the body. */
+    fun toggleTask(sourceLine: Int) {
+        val state = _uiState.value
+        if (state.isLoading || state.isReadOnly) return
+        val newText = MarkdownFormatter.toggleTask(state.body.text, sourceLine) ?: return
+        val selection = TextRange(
+            state.body.selection.start.coerceAtMost(newText.length),
+            state.body.selection.end.coerceAtMost(newText.length),
+        )
+        _uiState.update { it.copy(body = TextFieldValue(newText, selection)) }
+        onTextEdited()
+    }
+
+    /** Moves the body selection to [range] (used by Find). Does not change the text. */
+    fun selectInBody(range: IntRange) {
+        _uiState.update {
+            val length = it.body.text.length
+            val start = range.first.coerceIn(0, length)
+            val end = (range.last + 1).coerceIn(start, length)
+            it.copy(body = it.body.copy(selection = TextRange(start, end)))
+        }
     }
 
     fun undo() {
@@ -192,6 +230,10 @@ class NoteEditorViewModel(
     }
 
     // ---- Internals ----
+
+    private fun TextFieldValue.toEdit() = TextEdit(text, selection.min, selection.max)
+
+    private fun TextEdit.toFieldValue() = TextFieldValue(text, TextRange(selectionStart, selectionEnd))
 
     private fun withStoredNote(action: suspend (Note) -> Unit) {
         val note = _uiState.value.note ?: return

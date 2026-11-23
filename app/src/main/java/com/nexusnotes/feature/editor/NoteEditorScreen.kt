@@ -1,5 +1,34 @@
 package com.nexusnotes.feature.editor
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.nexusnotes.domain.markdown.FormatAction
+import com.nexusnotes.domain.markdown.MarkdownFormatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,7 +89,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.nexusnotes.core.design.components.MilestoneBadge
 import com.nexusnotes.core.design.components.NexusScreen
 import com.nexusnotes.core.design.icons.NexusIcons
 import com.nexusnotes.core.design.theme.NoteLabelColors
@@ -96,10 +124,34 @@ fun NoteEditorScreen(
     }
 
     var menuOpen by remember { mutableStateOf(false) }
+    var previewMode by rememberSaveable { mutableStateOf(false) }
+    var findOpen by rememberSaveable { mutableStateOf(false) }
+    var findQuery by rememberSaveable { mutableStateOf("") }
+    var findIndex by rememberSaveable { mutableIntStateOf(0) }
+    var focusMode by rememberSaveable { mutableStateOf(false) }
     var showColorDialog by rememberSaveable { mutableStateOf(false) }
     var showInfoDialog by rememberSaveable { mutableStateOf(false) }
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
     val note = state.note
+    val matches = remember(state.body.text, findQuery, findOpen) {
+        if (findOpen) MarkdownFormatter.findMatches(state.body.text, findQuery) else emptyList()
+    }
+    val currentMatch = if (matches.isEmpty()) -1 else findIndex.coerceIn(0, matches.lastIndex)
+    fun goToMatch(index: Int) {
+        if (matches.isEmpty()) return
+        val wrapped = ((index % matches.size) + matches.size) % matches.size
+        findIndex = wrapped
+        viewModel.selectInBody(matches[wrapped])
+    }
+
+    if (focusMode && !state.isLoading) {
+        FocusModeEditor(
+            state = state,
+            onBodyChange = viewModel::onBodyChange,
+            onExit = { focusMode = false },
+        )
+        return
+    }
 
     NexusScreen(
         title = "",
@@ -114,6 +166,16 @@ fun NoteEditorScreen(
                 }
                 IconButton(onClick = viewModel::redo, enabled = state.canRedo) {
                     Icon(NexusIcons.Redo, contentDescription = "Redo")
+                }
+            }
+            IconButton(
+                onClick = { previewMode = !previewMode },
+                modifier = Modifier.testTag(EDITOR_PREVIEW_TOGGLE_TAG),
+            ) {
+                if (previewMode) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                } else {
+                    Icon(NexusIcons.Preview, contentDescription = "Preview")
                 }
             }
             if (note != null && !state.isReadOnly) {
@@ -150,6 +212,25 @@ fun NoteEditorScreen(
                                 onClick = { menuOpen = false; showDeleteDialog = true },
                             )
                         } else {
+                            DropdownMenuItem(
+                                text = { Text("Find in note") },
+                                leadingIcon = { Icon(Icons.Filled.Search, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    previewMode = false
+                                    findOpen = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Focus mode") },
+                                leadingIcon = { Icon(NexusIcons.Fullscreen, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    previewMode = false
+                                    findOpen = false
+                                    focusMode = true
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Color label") },
                                 leadingIcon = { Icon(NexusIcons.Palette, null) },
@@ -195,8 +276,34 @@ fun NoteEditorScreen(
         EditorContent(
             state = state,
             padding = padding,
+            previewMode = previewMode,
+            findBar = if (findOpen && !previewMode && !state.isReadOnly) {
+                {
+                    FindBar(
+                        query = findQuery,
+                        onQueryChange = {
+                            findQuery = it
+                            findIndex = 0
+                        },
+                        matchCount = matches.size,
+                        currentIndex = currentMatch,
+                        onPrevious = { goToMatch(currentMatch - 1) },
+                        onNext = { goToMatch(currentMatch + 1) },
+                        onClose = {
+                            findOpen = false
+                            findQuery = ""
+                        },
+                    )
+                }
+            } else {
+                null
+            },
+            highlights = matches,
+            currentHighlight = currentMatch,
             onTitleChange = viewModel::onTitleChange,
             onBodyChange = viewModel::onBodyChange,
+            onFormat = viewModel::format,
+            onToggleTask = viewModel::toggleTask,
             onRestore = viewModel::restore,
         )
     }
@@ -236,8 +343,14 @@ fun NoteEditorScreen(
 private fun EditorContent(
     state: EditorUiState,
     padding: androidx.compose.foundation.layout.PaddingValues,
+    previewMode: Boolean,
+    findBar: (@Composable () -> Unit)?,
+    highlights: List<IntRange>,
+    currentHighlight: Int,
     onTitleChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit,
     onBodyChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit,
+    onFormat: (FormatAction) -> Unit,
+    onToggleTask: (Int) -> Unit,
     onRestore: () -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
@@ -261,6 +374,7 @@ private fun EditorContent(
             .consumeWindowInsets(padding)
             .imePadding(),
     ) {
+        findBar?.invoke()
         if (state.isReadOnly) {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
@@ -324,34 +438,239 @@ private fun EditorContent(
         }
         HorizontalDivider(Modifier.padding(top = spacing.sm), color = MaterialTheme.colorScheme.outlineVariant)
 
-        TextField(
-            value = state.body,
-            onValueChange = onBodyChange,
-            readOnly = state.isReadOnly,
-            placeholder = { Text("Start writing…") },
-            textStyle = MaterialTheme.typography.bodyLarge,
-            colors = fieldColors,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .testTag(EDITOR_BODY_TAG),
-        )
+        val highlightColor = MaterialTheme.colorScheme.secondaryContainer
+        val currentColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)
+        val transformation = remember(highlights, currentHighlight, highlightColor, currentColor) {
+            if (highlights.isEmpty()) {
+                VisualTransformation.None
+            } else {
+                FindHighlightTransformation(highlights, currentHighlight, highlightColor, currentColor)
+            }
+        }
 
-        if (!state.isReadOnly) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Row(
-                Modifier
+        if (previewMode) {
+            MarkdownPreview(
+                markdown = state.body.text,
+                onToggleTask = if (state.isReadOnly) null else onToggleTask,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(spacing.lg),
+                modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
+                    .testTag(PREVIEW_TAG),
+            )
+        } else {
+            TextField(
+                value = state.body,
+                onValueChange = onBodyChange,
+                readOnly = state.isReadOnly,
+                placeholder = { Text("Start writing… Markdown works: **bold**, # heading, - list") },
+                textStyle = MaterialTheme.typography.bodyLarge,
+                colors = fieldColors,
+                visualTransformation = transformation,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .testTag(EDITOR_BODY_TAG),
+            )
+        }
+
+        if (!state.isReadOnly && !previewMode) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            FormattingToolbar(onFormat = onFormat)
+        }
+    }
+}
+
+private data class ToolbarItem(val action: FormatAction, val label: String, val description: String, val style: SpanStyle? = null)
+
+private val ToolbarItems = listOf(
+    ToolbarItem(FormatAction.BOLD, "B", "Bold", SpanStyle(fontWeight = FontWeight.Bold)),
+    ToolbarItem(FormatAction.ITALIC, "I", "Italic", SpanStyle(fontStyle = FontStyle.Italic)),
+    ToolbarItem(FormatAction.UNDERLINE, "U", "Underline", SpanStyle(textDecoration = TextDecoration.Underline)),
+    ToolbarItem(FormatAction.STRIKETHROUGH, "S", "Strikethrough", SpanStyle(textDecoration = TextDecoration.LineThrough)),
+    ToolbarItem(FormatAction.H1, "H1", "Heading 1"),
+    ToolbarItem(FormatAction.H2, "H2", "Heading 2"),
+    ToolbarItem(FormatAction.H3, "H3", "Heading 3"),
+    ToolbarItem(FormatAction.BULLET, "•", "Bulleted list"),
+    ToolbarItem(FormatAction.NUMBERED, "1.", "Numbered list"),
+    ToolbarItem(FormatAction.TASK, "☐", "Checklist"),
+    ToolbarItem(FormatAction.QUOTE, "❝", "Quote"),
+    ToolbarItem(FormatAction.INLINE_CODE, "<>", "Inline code", SpanStyle(fontFamily = FontFamily.Monospace)),
+    ToolbarItem(FormatAction.CODE_BLOCK, "{ }", "Code block", SpanStyle(fontFamily = FontFamily.Monospace)),
+    ToolbarItem(FormatAction.LINK, "Link", "Insert link"),
+    ToolbarItem(FormatAction.TABLE, "Table", "Insert table"),
+)
+
+const val FORMAT_TOOLBAR_TAG = "format_toolbar"
+const val EDITOR_PREVIEW_TOGGLE_TAG = "editor_preview_toggle"
+
+@Composable
+private fun FormattingToolbar(onFormat: (FormatAction) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = MaterialTheme.spacing.xs)
+            .testTag(FORMAT_TOOLBAR_TAG),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ToolbarItems.forEach { item ->
+            TextButton(
+                onClick = { onFormat(item.action) },
+                modifier = Modifier.semantics { contentDescription = item.description },
             ) {
-                MilestoneBadge(3, Modifier.padding(horizontal = spacing.sm))
-                listOf("B", "I", "U", "S", "H1", "H2", "•", "1.", "☐", "❝", "</>").forEach {
-                    TextButton(onClick = {}, enabled = false) { Text(it) }
+                Text(
+                    text = if (item.style != null) {
+                        buildAnnotatedString { withStyle(item.style) { append(item.label) } }
+                    } else {
+                        AnnotatedString(item.label)
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FindBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    matchCount: Int,
+    currentIndex: Int,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.padding(horizontal = MaterialTheme.spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                placeholder = { Text("Find in note") },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onNext() }),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester)
+                    .testTag(FIND_FIELD_TAG),
+            )
+            Text(
+                text = when {
+                    query.isEmpty() -> ""
+                    matchCount == 0 -> "0/0"
+                    else -> "${currentIndex + 1}/$matchCount"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(FIND_COUNT_TAG),
+            )
+            IconButton(onClick = onPrevious, enabled = matchCount > 0) {
+                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Previous match")
+            }
+            IconButton(onClick = onNext, enabled = matchCount > 0) {
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Next match")
+            }
+            IconButton(onClick = onClose) {
+                Icon(Icons.Filled.Close, contentDescription = "Close find")
+            }
+        }
+    }
+}
+
+const val FIND_FIELD_TAG = "find_field"
+const val FIND_COUNT_TAG = "find_count"
+
+/** Highlights find matches inside the editor without changing the stored text. */
+private data class FindHighlightTransformation(
+    val ranges: List<IntRange>,
+    val current: Int,
+    val color: Color,
+    val currentColor: Color,
+) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val styled = buildAnnotatedString {
+            append(text)
+            ranges.forEachIndexed { index, range ->
+                val start = range.first.coerceIn(0, text.length)
+                val end = (range.last + 1).coerceIn(start, text.length)
+                if (end > start) {
+                    addStyle(SpanStyle(background = if (index == current) currentColor else color), start, end)
                 }
             }
+        }
+        return TransformedText(styled, OffsetMapping.Identity)
+    }
+}
+
+/** Distraction-free writing: body only, system bars hidden, Back exits. */
+@Composable
+private fun FocusModeEditor(
+    state: EditorUiState,
+    onBodyChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit,
+    onExit: () -> Unit,
+) {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.context as? Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller?.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+    BackHandler(onBack = onExit)
+
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().imePadding()) {
+            TextField(
+                value = state.body,
+                onValueChange = onBodyChange,
+                readOnly = state.isReadOnly,
+                placeholder = { Text("Write…") },
+                textStyle = MaterialTheme.typography.bodyLarge.copy(lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2f),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = MaterialTheme.spacing.xl, vertical = MaterialTheme.spacing.xxl)
+                    .testTag(EDITOR_BODY_TAG),
+            )
+            IconButton(
+                onClick = onExit,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(MaterialTheme.spacing.sm),
+            ) {
+                Icon(
+                    NexusIcons.FullscreenExit,
+                    contentDescription = "Exit focus mode",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = state.saveState.label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(MaterialTheme.spacing.md),
+            )
         }
     }
 }

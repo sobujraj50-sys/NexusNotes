@@ -250,9 +250,9 @@ fun AboutScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(spacing.lg))
             SectionHeader("Build status")
             Text(
-                "Milestone 2 of 10: notes are saved on this phone with autosave, pin, favorites, " +
-                    "archive, trash, colors, sorting and undo/redo. Features marked with a milestone " +
-                    "badge are not built yet.",
+                "Milestone 3 of 10: notes with autosave, pin, favorites, archive, trash, colors, " +
+                    "sorting, undo/redo, and a Markdown editor with preview, find and focus mode. " +
+                    "Features marked with a milestone badge are not built yet.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

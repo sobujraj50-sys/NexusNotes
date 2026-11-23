@@ -3,7 +3,8 @@
 | Date | Milestone | Status | Notes |
 |---|---|---|---|
 | 2026-11-21 | M1 Foundation | Approved | Built by GitHub Actions (run #3), installed and checked on user's phone |
-| 2026-11-23 | M2 Database + notes | Delivered, awaiting build + phone test | 29 JVM tests pass; DAO + UI tests need a device |
+| 2026-11-23 | M2 Database + notes | Approved | GitHub build #5 green; all features verified on phone. Build #4 failed: ZIP contained .github (token cannot change workflows) — ZIPs no longer include .github |
+| 2026-11-23 | M3 Markdown editor | Delivered, awaiting build + phone test | 81 JVM tests pass; own parser, no new dependencies |
 
 ## Decisions log
 - Markdown is the canonical note format (avoids lossy rich-text conversion).
@@ -15,3 +16,4 @@
 - M2: Room 2.8.5 + KSP 2.3.12, DataStore 1.3.0. Schema JSON committed by the CI workflow.
 - M2: empty new notes are never stored; Trash is read-only; flags don't change "last edited".
 - Build & release: ZIP upload to GitHub → Actions builds a signed APK into Releases.
+- M3: Markdown is the single stored format (Nexus Markdown v1); own parser/formatter instead of a library.
