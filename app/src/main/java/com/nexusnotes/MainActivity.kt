@@ -18,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nexusnotes.core.design.theme.NexusTheme
 import com.nexusnotes.domain.model.AppSettings
 import com.nexusnotes.domain.model.ThemeMode
+import com.nexusnotes.core.database.CrashReportDialog
 import com.nexusnotes.core.database.DatabaseErrorScreen
 import com.nexusnotes.core.database.DatabaseState
 import com.nexusnotes.navigation.NexusNotesRoot
@@ -59,6 +60,7 @@ class MainActivity : ComponentActivity() {
                     DatabaseState.Ready -> NexusNotesRoot()
                     is DatabaseState.Failed -> DatabaseErrorScreen(state.error)
                 }
+                CrashReportDialog()
             }
         }
     }

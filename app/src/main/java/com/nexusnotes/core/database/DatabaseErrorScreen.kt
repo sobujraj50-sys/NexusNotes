@@ -15,6 +15,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import com.nexusnotes.core.design.theme.spacing
@@ -56,4 +58,48 @@ fun DatabaseErrorScreen(error: Throwable) {
             }
         }
     }
+}
+
+/** Shows the error from the last crash (if any) so it can be copied and reported. */
+@Composable
+fun CrashReportDialog() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var report by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(com.nexusnotes.core.common.CrashReporter.lastCrash(context))
+    }
+    val text = report ?: return
+    fun dismiss() {
+        com.nexusnotes.core.common.CrashReporter.clear(context)
+        report = null
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { dismiss() },
+        icon = { Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text("The app closed unexpectedly") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "Your notes are safe. Tap Copy and send this report so the problem can be fixed. " +
+                        "It contains only the technical error, not your notes, and stays on this phone unless you share it.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                SelectionContainer {
+                    Text(
+                        text,
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = MaterialTheme.spacing.md),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                com.nexusnotes.core.common.ShareUtils.copy(context, "Nexus Notes crash report", text)
+                dismiss()
+            }) { Text("Copy") }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = { dismiss() }) { Text("Close") } },
+    )
 }
