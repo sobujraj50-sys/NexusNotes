@@ -12,6 +12,7 @@ import com.nexusnotes.core.database.NexusDatabase
 import com.nexusnotes.data.repository.NoteRepository
 import com.nexusnotes.data.repository.OfflineNoteRepository
 import com.nexusnotes.data.repository.OrganizationRepository
+import com.nexusnotes.data.repository.PromptRepository
 import com.nexusnotes.data.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,11 @@ class AppContainer(context: Context) {
     val organizationRepository: OrganizationRepository by lazy {
         OrganizationRepository(database.folderDao(), database.tagDao(), clock)
     }
+
+    val promptRepository: PromptRepository by lazy { PromptRepository(database.promptDao(), clock) }
+
+    /** For reading/writing files the user picks (import/export). */
+    val contentResolver: android.content.ContentResolver get() = appContext.contentResolver
 
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext.settingsDataStore) }
 }

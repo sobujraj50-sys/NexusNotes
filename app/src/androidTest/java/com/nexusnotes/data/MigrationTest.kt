@@ -82,6 +82,12 @@ class MigrationTest {
             // Trash is never searched.
             assertEquals(0, dao.search("\"trash*\"", null, false, null, false, 50).first().size)
 
+            // Prompt tables exist after the full v1 -> v3 chain and are searchable.
+            val prompts = db.promptDao()
+            prompts.saveContent("p1", "Cinematic", "A {{subject}} at golden hour", "IMAGE_GENERATION", now = 1, newVersionId = "v1")
+            assertEquals(listOf("p1"), prompts.search("\"golden*\"", 10).first().map { it.id })
+            assertEquals(1, prompts.observeVersions("p1").first().size)
+
             // The index follows later edits (sync triggers exist).
             dao.updateContent("a", "Shopping list", "eggs", 50)
             assertEquals(0, dao.search("\"milk*\"", null, false, null, false, 50).first().size)

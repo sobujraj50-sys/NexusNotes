@@ -261,8 +261,9 @@ fun AboutScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(spacing.lg))
             SectionHeader("Build status")
             Text(
-                "Milestone 4 of 10: notes with autosave, Markdown editor, nested folders, tags and " +
-                    "offline full-text search. Features marked with a milestone badge are not built yet.",
+                "Milestone 5 of 10: notes with autosave, Markdown editor, nested folders, tags, " +
+                    "offline full-text search and the AI Prompt Library with templates, history and " +
+                    "import/export. Features marked with a milestone badge are not built yet.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

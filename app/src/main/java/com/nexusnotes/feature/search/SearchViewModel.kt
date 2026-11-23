@@ -9,10 +9,12 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.nexusnotes.appContainer
 import com.nexusnotes.data.repository.NoteRepository
 import com.nexusnotes.data.repository.OrganizationRepository
+import com.nexusnotes.data.repository.PromptRepository
 import com.nexusnotes.data.repository.SettingsRepository
 import com.nexusnotes.domain.NoteText
 import com.nexusnotes.domain.model.FolderNode
 import com.nexusnotes.domain.model.Note
+import com.nexusnotes.domain.model.Prompt
 import com.nexusnotes.domain.model.SearchFilter
 import com.nexusnotes.domain.model.TagWithCount
 import com.nexusnotes.domain.search.SearchQuery
@@ -48,6 +50,7 @@ data class SearchUiState(
     val tags: List<TagWithCount> = emptyList(),
     val history: List<String> = emptyList(),
     val saveHistory: Boolean = false,
+    val prompts: List<Prompt> = emptyList(),
 ) {
     val hasCriteria: Boolean
         get() = SearchQuery.terms(query).isNotEmpty() || filter.folderId != null || filter.unfiledOnly || filter.tagId != null
@@ -59,11 +62,19 @@ data class SearchUiState(
         get() = if (query.isBlank()) emptyList() else tags.filter { it.tag.name.contains(query.trim().removePrefix("#"), ignoreCase = true) }.take(8)
 }
 
+private data class SearchInputs(
+    val query: String,
+    val filter: SearchFilter,
+    val results: List<SearchResult>,
+    val prompts: List<Prompt>,
+)
+
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class SearchViewModel(
     savedStateHandle: SavedStateHandle,
     private val notes: NoteRepository,
     organization: OrganizationRepository,
+    prompts: PromptRepository,
     private val settings: SettingsRepository,
 ) : ViewModel() {
 
@@ -90,17 +101,28 @@ class SearchViewModel(
             }
         }
 
+    /** Prompts are searched only for plain text searches (folder/tag filters apply to notes). */
+    private val promptResults = combine(query.debounce(200).map { it.trim() }.distinctUntilChanged(), filter) { q, f -> q to f }
+        .flatMapLatest { (q, f) ->
+            if (q.isBlank() || f.folderId != null || f.unfiledOnly || f.tagId != null) {
+                kotlinx.coroutines.flow.flowOf(emptyList<Prompt>())
+            } else {
+                prompts.search(q, limit = 20)
+            }
+        }
+
     val uiState: StateFlow<SearchUiState> = combine(
-        combine(query, filter, results) { q, f, r -> Triple(q, f, r) },
+        combine(query, filter, results, promptResults) { q, f, r, p -> SearchInputs(q, f, r, p) },
         organization.observeFolderTree(),
         organization.observeTagsWithCounts(),
         settings.settings,
-    ) { (q, f, r), folders, tags, appSettings ->
+    ) { input, folders, tags, appSettings ->
         SearchUiState(
-            query = q,
-            filter = f,
+            query = input.query,
+            filter = input.filter,
             isLoading = false,
-            results = r,
+            results = input.results,
+            prompts = input.prompts,
             folders = folders,
             tags = tags,
             history = if (appSettings.saveSearchHistory) appSettings.searchHistory else emptyList(),
@@ -148,7 +170,7 @@ class SearchViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val c = appContainer()
-                SearchViewModel(createSavedStateHandle(), c.noteRepository, c.organizationRepository, c.settingsRepository)
+                SearchViewModel(createSavedStateHandle(), c.noteRepository, c.organizationRepository, c.promptRepository, c.settingsRepository)
             }
         }
     }

@@ -108,34 +108,32 @@ fun NexusNavHost(
         composable(
             route = NexusDestination.Search.route,
             arguments = listOf(optionalString(ARG_TAG_ID), optionalString(ARG_FOLDER_ID)),
-        ) { SearchScreen(onOpenNote = openNote, onBack = back) }
+        ) {
+            SearchScreen(
+                onOpenNote = openNote,
+                onOpenPrompt = { id -> navigate(NexusDestination.PromptEditor.createRoute(id)) },
+                onBack = back,
+            )
+        }
 
         // Prompts
         composable(
             route = NexusDestination.PromptEditor.route,
-            arguments = listOf(
-                navArgument(ARG_PROMPT_ID) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-            ),
-        ) { entry ->
+            arguments = listOf(optionalString(ARG_PROMPT_ID), optionalString(ARG_CATEGORY)),
+        ) {
             PromptEditorScreen(
-                promptId = entry.arguments?.getString(ARG_PROMPT_ID),
-                onNavigate = navigate,
                 onBack = back,
+                onOpenPrompt = { id ->
+                    navController.navigate(NexusDestination.PromptEditor.createRoute(id)) {
+                        popUpTo(NexusDestination.PromptEditor.route) { inclusive = true }
+                    }
+                },
+                onRun = { id -> navigate(NexusDestination.PromptRunner.createRoute(id)) },
             )
         }
         composable(
             route = NexusDestination.PromptRunner.route,
-            arguments = listOf(
-                navArgument(ARG_PROMPT_ID) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-            ),
+            arguments = listOf(optionalString(ARG_PROMPT_ID)),
         ) { PromptRunnerScreen(onBack = back) }
 
         // Security, data and app info

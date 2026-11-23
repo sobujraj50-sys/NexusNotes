@@ -82,3 +82,24 @@ data class SearchFilter(
     val tagId: String? = null,
     val includeArchived: Boolean = false,
 )
+
+/** A saved prompt template. [categoryKey]: built-in PromptCategory name or "custom:<id>". */
+data class Prompt(
+    val id: String,
+    val title: String,
+    val template: String,
+    val categoryKey: String,
+    val isFavorite: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+data class PromptVersion(val id: String, val title: String, val template: String, val createdAt: Long)
+
+/** A category as shown in the UI: built-in or user-created. */
+data class PromptCategoryRef(val key: String, val name: String, val isCustom: Boolean) {
+    companion object {
+        const val CUSTOM_PREFIX = "custom:"
+        fun customKey(id: String) = CUSTOM_PREFIX + id
+    }
+}

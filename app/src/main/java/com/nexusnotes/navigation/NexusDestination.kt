@@ -4,6 +4,7 @@ const val ARG_NOTE_ID = "noteId"
 const val ARG_FOLDER_ID = "folderId"
 const val ARG_PROMPT_ID = "promptId"
 const val ARG_TAG_ID = "tagId"
+const val ARG_CATEGORY = "category"
 
 /** Virtual folder id for notes that have no folder. Never stored as a real folder row. */
 const val UNFILED_FOLDER_ID = "unfiled"
@@ -35,9 +36,10 @@ sealed class NexusDestination(val route: String, val title: String) {
     data object Tags : NexusDestination("tags", "Tags")
     data object PromptLibrary : NexusDestination("prompts", "Prompt Library")
 
-    data object PromptEditor : NexusDestination("prompts/editor?$ARG_PROMPT_ID={$ARG_PROMPT_ID}", "Prompt") {
-        fun createRoute(promptId: String? = null): String =
-            if (promptId == null) "prompts/editor" else "prompts/editor?$ARG_PROMPT_ID=$promptId"
+    data object PromptEditor : NexusDestination("prompts/editor?$ARG_PROMPT_ID={$ARG_PROMPT_ID}&$ARG_CATEGORY={$ARG_CATEGORY}", "Prompt") {
+        /** [category] pre-selects the category of a new prompt. */
+        fun createRoute(promptId: String? = null, category: String? = null): String =
+            withQuery("prompts/editor", ARG_PROMPT_ID to promptId, ARG_CATEGORY to category)
     }
 
     data object PromptRunner : NexusDestination("prompts/run?$ARG_PROMPT_ID={$ARG_PROMPT_ID}", "Template Runner") {

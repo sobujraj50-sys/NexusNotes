@@ -112,10 +112,10 @@ Room database `nexus.db`, `exportSchema = true`, schemas committed under `app/sc
 | TagEntity (**built v2**) | id, name | Unique index on name; case-insensitive uniqueness enforced in TagDao. |
 | NoteTagCrossRef (**built v2**) | noteId, tagId | Composite PK; both FKs CASCADE; index on tagId. |
 | AttachmentEntity | id, noteId, type, fileName (internal), displayName, mimeType, sizeBytes, sha256, createdAt | FK noteId CASCADE; files live in `filesDir/attachments/`, never as blobs. |
-| PromptEntity | id, title, template, categoryKey, isFavorite, createdAt, updatedAt | categoryKey = `PromptCategory.name` or custom category id. FTS table for prompts too. |
-| PromptCategoryEntity | id, name, sortOrder | User-defined categories (built-ins come from the enum). |
-| PromptVariableEntity | id, promptId, name, defaultValue?, description? | FK CASCADE; unique (promptId, name). |
-| NoteVersionEntity | id, ownerType, ownerId, title, body, createdAt | Version history for notes and prompts; capped per item. |
+| PromptEntity (**built v3**) | id, title, template, categoryKey, isFavorite, createdAt, updatedAt | categoryKey = `PromptCategory.name` or custom category id. FTS table for prompts too. |
+| PromptCategoryEntity (**built v3**) | id, name, createdAt | User-defined categories (built-ins come from the enum). |
+| PromptVariableEntity (**built v3**) | promptId, name, defaultValue | FK CASCADE; unique (promptId, name). |
+| PromptVersionEntity (**built v3**) | id, promptId, title, template, createdAt | Prompt history (5-min coalescing, 30 kept). Note history planned later. |
 | ReminderEntity | id, noteId, triggerAt, repeatRule?, enabled | FK CASCADE. Notification text never shows vault or note body content. |
 | VaultItemEntity | id, ciphertext, iv, keyVersion, createdAt, updatedAt | **Separate encrypted table**: title+body+metadata encrypted together as one AES-GCM blob. No plaintext columns. |
 | BackupHistoryEntity | id, createdAt, destinationLabel, itemCount, sha256, schemaVersion, result | Informational only. |

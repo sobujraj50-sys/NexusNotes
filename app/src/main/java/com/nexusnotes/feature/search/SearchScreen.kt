@@ -66,6 +66,7 @@ const val SEARCH_RESULT_TAG = "search_result"
 @Composable
 fun SearchScreen(
     onOpenNote: (String) -> Unit,
+    onOpenPrompt: (String) -> Unit,
     onBack: () -> Unit,
     viewModel: SearchViewModel = viewModel(factory = SearchViewModel.Factory),
 ) {
@@ -182,7 +183,7 @@ fun SearchScreen(
                             modifier = Modifier.padding(top = spacing.md),
                         )
                     }
-                } else if (state.results.isEmpty() && !state.isLoading) {
+                } else if (state.results.isEmpty() && state.prompts.isEmpty() && !state.isLoading) {
                     item(key = "none") {
                         Box(Modifier.fillMaxWidth().height(320.dp)) {
                             CenteredEmptyState(
@@ -196,7 +197,7 @@ fun SearchScreen(
                 } else {
                     item(key = "count") {
                         Text(
-                            "${state.results.size} note(s)",
+                            "${state.results.size} note(s)" + if (state.prompts.isNotEmpty()) " · ${state.prompts.size} prompt(s)" else "",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -205,6 +206,25 @@ fun SearchScreen(
                         ResultCard(result) {
                             viewModel.commitQuery()
                             onOpenNote(result.note.id)
+                        }
+                    }
+                    if (state.prompts.isNotEmpty()) {
+                        item(key = "prompts_header") { SectionHeader("Prompts", Modifier.padding(top = spacing.sm)) }
+                        items(state.prompts, key = { "p_" + it.id }) { prompt ->
+                            val terms = remember(state.query) { com.nexusnotes.domain.search.SearchQuery.terms(state.query) }
+                            ResultCard(
+                                SearchResult(
+                                    note = com.nexusnotes.domain.model.Note(
+                                        prompt.id, prompt.title, prompt.template, null, false, false, false, null, prompt.createdAt, prompt.updatedAt,
+                                    ),
+                                    title = prompt.title.ifBlank { "Untitled prompt" },
+                                    titleHighlights = com.nexusnotes.domain.search.SearchQuery.highlightRanges(prompt.title, terms),
+                                    snippet = com.nexusnotes.domain.search.SearchQuery.snippet(prompt.template, terms),
+                                ),
+                            ) {
+                                viewModel.commitQuery()
+                                onOpenPrompt(prompt.id)
+                            }
                         }
                     }
                 }

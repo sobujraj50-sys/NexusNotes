@@ -6,11 +6,17 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.nexusnotes.data.dao.FolderDao
 import com.nexusnotes.data.dao.NoteDao
+import com.nexusnotes.data.dao.PromptDao
 import com.nexusnotes.data.dao.TagDao
 import com.nexusnotes.data.entity.FolderEntity
 import com.nexusnotes.data.entity.NoteEntity
 import com.nexusnotes.data.entity.NoteFtsEntity
 import com.nexusnotes.data.entity.NoteTagCrossRef
+import com.nexusnotes.data.entity.PromptCategoryEntity
+import com.nexusnotes.data.entity.PromptEntity
+import com.nexusnotes.data.entity.PromptFtsEntity
+import com.nexusnotes.data.entity.PromptVariableEntity
+import com.nexusnotes.data.entity.PromptVersionEntity
 import com.nexusnotes.data.entity.TagEntity
 
 /**
@@ -26,18 +32,24 @@ import com.nexusnotes.data.entity.TagEntity
         TagEntity::class,
         NoteTagCrossRef::class,
         NoteFtsEntity::class,
+        PromptEntity::class,
+        PromptCategoryEntity::class,
+        PromptVariableEntity::class,
+        PromptVersionEntity::class,
+        PromptFtsEntity::class,
     ],
-    version = 2, // keep equal to VERSION below
+    version = 3, // keep equal to VERSION below
     exportSchema = true,
 )
 abstract class NexusDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun folderDao(): FolderDao
     abstract fun tagDao(): TagDao
+    abstract fun promptDao(): PromptDao
 
     companion object {
         const val NAME = "nexus.db"
-        const val VERSION = 2
+        const val VERSION = 3
 
         fun build(context: Context): NexusDatabase {
             DatabaseSafety.backupBeforeUpgrade(context.applicationContext, VERSION)
