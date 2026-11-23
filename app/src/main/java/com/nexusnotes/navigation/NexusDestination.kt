@@ -3,6 +3,7 @@ package com.nexusnotes.navigation
 const val ARG_NOTE_ID = "noteId"
 const val ARG_FOLDER_ID = "folderId"
 const val ARG_PROMPT_ID = "promptId"
+const val ARG_TAG_ID = "tagId"
 
 /** Virtual folder id for notes that have no folder. Never stored as a real folder row. */
 const val UNFILED_FOLDER_ID = "unfiled"
@@ -19,9 +20,10 @@ sealed class NexusDestination(val route: String, val title: String) {
     data object Home : NexusDestination("home", "Nexus Notes")
     data object AllNotes : NexusDestination("notes", "All Notes")
 
-    data object NoteEditor : NexusDestination("editor?$ARG_NOTE_ID={$ARG_NOTE_ID}", "Note") {
-        fun createRoute(noteId: String? = null): String =
-            if (noteId == null) "editor" else "editor?$ARG_NOTE_ID=$noteId"
+    data object NoteEditor : NexusDestination("editor?$ARG_NOTE_ID={$ARG_NOTE_ID}&$ARG_FOLDER_ID={$ARG_FOLDER_ID}", "Note") {
+        /** [folderId] puts a new note into that folder. Ignored for existing notes. */
+        fun createRoute(noteId: String? = null, folderId: String? = null): String =
+            withQuery("editor", ARG_NOTE_ID to noteId, ARG_FOLDER_ID to folderId)
     }
 
     data object Folders : NexusDestination("folders", "Folders")
@@ -43,7 +45,11 @@ sealed class NexusDestination(val route: String, val title: String) {
             if (promptId == null) "prompts/run" else "prompts/run?$ARG_PROMPT_ID=$promptId"
     }
 
-    data object Search : NexusDestination("search", "Search")
+    data object Search : NexusDestination("search?$ARG_TAG_ID={$ARG_TAG_ID}&$ARG_FOLDER_ID={$ARG_FOLDER_ID}", "Search") {
+        /** Opens Search pre-filtered by a tag and/or folder (use UNFILED_FOLDER_ID for Unfiled). */
+        fun createRoute(tagId: String? = null, folderId: String? = null): String =
+            withQuery("search", ARG_TAG_ID to tagId, ARG_FOLDER_ID to folderId)
+    }
     data object Favorites : NexusDestination("favorites", "Favorites")
     data object Archive : NexusDestination("archive", "Archive")
     data object Trash : NexusDestination("trash", "Trash")
@@ -51,6 +57,12 @@ sealed class NexusDestination(val route: String, val title: String) {
     data object Backup : NexusDestination("backup", "Backup & Restore")
     data object Settings : NexusDestination("settings", "Settings")
     data object About : NexusDestination("about", "About")
+}
+
+/** Builds "base?a=1&b=2", skipping null values. Values are UUIDs or fixed ids (URL-safe). */
+internal fun withQuery(base: String, vararg params: Pair<String, String?>): String {
+    val query = params.filter { it.second != null }.joinToString("&") { "${it.first}=${it.second}" }
+    return if (query.isEmpty()) base else "$base?$query"
 }
 
 /** Bottom-navigation destinations, in display order. */

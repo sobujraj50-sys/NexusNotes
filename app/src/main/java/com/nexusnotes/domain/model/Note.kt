@@ -15,6 +15,7 @@ data class Note(
     val deletedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
+    val folderId: String? = null,
 ) {
     val isInTrash: Boolean get() = deletedAt != null
 }
@@ -37,6 +38,8 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dynamicColor: Boolean = false,
     val noteSort: NoteSort = NoteSort.MODIFIED,
+    val saveSearchHistory: Boolean = false,
+    val searchHistory: List<String> = emptyList(),
 )
 
 /** Result of an autosave attempt. */
@@ -56,3 +59,26 @@ enum class SaveOutcome {
     /** Notes in Trash are read-only. */
     READ_ONLY,
 }
+
+data class Folder(
+    val id: String,
+    val name: String,
+    val parentId: String?,
+    val colorIndex: Int?,
+    val createdAt: Long,
+)
+
+/** A folder placed in the tree: [depth] 0 = top level. */
+data class FolderNode(val folder: Folder, val depth: Int, val noteCount: Int = 0)
+
+data class Tag(val id: String, val name: String)
+
+data class TagWithCount(val tag: Tag, val noteCount: Int)
+
+/** Filters for the Search screen. A null field means "any". */
+data class SearchFilter(
+    val folderId: String? = null,
+    val unfiledOnly: Boolean = false,
+    val tagId: String? = null,
+    val includeArchived: Boolean = false,
+)

@@ -11,10 +11,12 @@ import com.nexusnotes.core.common.WallClock
 import com.nexusnotes.core.database.NexusDatabase
 import com.nexusnotes.data.repository.NoteRepository
 import com.nexusnotes.data.repository.OfflineNoteRepository
+import com.nexusnotes.data.repository.OrganizationRepository
 import com.nexusnotes.data.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -34,7 +36,23 @@ class AppContainer(context: Context) {
 
     val noteRepository: NoteRepository by lazy { OfflineNoteRepository(database.noteDao(), clock) }
 
+    val organizationRepository: OrganizationRepository by lazy {
+        OrganizationRepository(database.folderDao(), database.tagDao(), clock)
+    }
+
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext.settingsDataStore) }
+}
+
+/**
+ * Opens (and if needed upgrades) the database off the main thread before any screen uses it.
+ * A failure is returned instead of crashing, so the app can show what went wrong; the
+ * pre-upgrade backup copy keeps the notes safe.
+ */
+suspend fun AppContainer.openDatabase(): Result<Unit> = withContext(Dispatchers.IO) {
+    runCatching {
+        database.openHelper.writableDatabase
+        Unit
+    }
 }
 
 /** Access the container from a ViewModel factory initializer. */

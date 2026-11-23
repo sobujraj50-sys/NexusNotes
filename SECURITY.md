@@ -21,6 +21,11 @@ Status: **Milestone 1 — no user data is stored and no encryption exists yet.**
 ## Rules (from the project brief)
 No ads, no trackers, no mandatory account or internet, no plaintext vault secrets, no sensitive logs, no silent uploads, no unnecessary permissions, no hard-coded keys, no destructive migrations, no private content in notifications, no unencrypted vault in backups, no insecure temp copies, no false security claims, no fake features.
 
+## Search (Milestone 4)
+- The full-text index lives inside the app database; it only ever contains normal notes. Vault notes (M7) are stored elsewhere and are never indexed.
+- Search history is **off by default**; when on, the last 10 queries are kept in local settings only; turning it off deletes them.
+- Before a database upgrade, a copy `nexus-backup-v<old>.db` is kept in app-private storage (not readable by other apps, excluded from Android backup).
+
 ## Data retention and deletion (target behavior)
 - Trash keeps notes until restored or permanently deleted (optional auto-empty after N days, user-set).
 - Permanent delete removes the row, its FTS entry, versions and attachment files.

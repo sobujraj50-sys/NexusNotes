@@ -26,6 +26,10 @@ class SettingsViewModel(private val settings: SettingsRepository) : ViewModel() 
         viewModelScope.launch { settings.setDynamicColor(enabled) }
     }
 
+    fun setSaveSearchHistory(enabled: Boolean) {
+        viewModelScope.launch { settings.setSaveSearchHistory(enabled) }
+    }
+
     companion object {
         val Factory = viewModelFactory {
             initializer { SettingsViewModel(appContainer().settingsRepository) }

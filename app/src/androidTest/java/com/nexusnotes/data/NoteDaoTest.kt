@@ -116,4 +116,27 @@ class NoteDaoTest {
         dao.setColor("a", 1)
         assertEquals(1, dao.getById("a")!!.updatedAt)
     }
+
+    @Test
+    fun deletingFolderKeepsNotes() = runBlocking {
+        val folders = db.folderDao()
+        folders.insert(com.nexusnotes.data.entity.FolderEntity("f1", "Work", null, null, 1))
+        folders.insert(com.nexusnotes.data.entity.FolderEntity("f2", "Sub", "f1", null, 1))
+        dao.saveContent("n1", "A", "", now = 1, folderIdForNew = "f2")
+        folders.deleteFoldersKeepNotes(listOf("f1", "f2"))
+        assertNull(dao.getById("n1")!!.folderId)
+        assertTrue(folders.getAll().isEmpty())
+    }
+
+    @Test
+    fun tagsAreCaseInsensitiveAndRemovedWithNote() = runBlocking {
+        val tags = db.tagDao()
+        dao.saveContent("n1", "A", "", now = 1)
+        tags.addTagToNote("n1", "Work", "t1")
+        tags.addTagToNote("n1", "work", "t2")
+        assertEquals(1, tags.observeForNote("n1").first().size)
+        dao.moveToTrash("n1", 2)
+        dao.deletePermanently("n1")
+        assertEquals(0, tags.tagIdsForNote("n1").size)
+    }
 }

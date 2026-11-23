@@ -13,7 +13,8 @@ import com.nexusnotes.domain.model.Note
  * - [body] is Markdown; [bodyFormatVersion] lets later milestones change the format safely.
  * - Trash is a soft delete via [deletedAt]. Flags (pin, favorite, color, archive) do not
  *   change [updatedAt]; only text edits do.
- * - folderId is added together with the folders table in Milestone 4 (with a migration).
+ * - [folderId] (added in schema v2) points to a folder, or null for "Unfiled". It has no SQL
+ *   foreign key (adding one needs a full table rebuild); the DAOs keep it consistent instead.
  */
 @Entity(
     tableName = "notes",
@@ -21,6 +22,7 @@ import com.nexusnotes.domain.model.Note
         Index(value = ["updatedAt"]),
         Index(value = ["deletedAt", "isArchived"]),
         Index(value = ["isPinned"]),
+        Index(value = ["folderId"]),
     ],
 )
 data class NoteEntity(
@@ -35,11 +37,12 @@ data class NoteEntity(
     val deletedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
+    val folderId: String? = null,
 ) {
     companion object {
         const val BODY_FORMAT_MARKDOWN_V1 = 1
 
-        fun new(id: String, title: String, body: String, now: Long) = NoteEntity(
+        fun new(id: String, title: String, body: String, now: Long, folderId: String? = null) = NoteEntity(
             id = id,
             title = title,
             body = body,
@@ -50,6 +53,7 @@ data class NoteEntity(
             deletedAt = null,
             createdAt = now,
             updatedAt = now,
+            folderId = folderId,
         )
     }
 }
@@ -65,4 +69,5 @@ fun NoteEntity.toDomain() = Note(
     deletedAt = deletedAt,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    folderId = folderId,
 )

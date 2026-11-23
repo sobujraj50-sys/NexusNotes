@@ -118,6 +118,17 @@ fun SettingsScreen(
                 )
             }
 
+            item { SectionHeader("Search", Modifier.padding(top = spacing.md)) }
+            item {
+                SwitchRow(
+                    title = "Remember searches",
+                    supporting = "Keep your last 10 searches on this phone. Off by default; turning it off deletes them.",
+                    checked = settings.saveSearchHistory,
+                    enabled = true,
+                    onCheckedChange = viewModel::setSaveSearchHistory,
+                )
+            }
+
             item { SectionHeader("Productivity & AI", Modifier.padding(top = spacing.md)) }
             item { NexusListRow(Icons.Filled.Notifications, "Reminders", supporting = "Asks for notification permission only when used", milestone = 9) }
             item { NexusListRow(NexusIcons.Sparkle, "AI features", supporting = "Off. Optional, never required, nothing is sent without your consent", milestone = 9) }
@@ -250,9 +261,8 @@ fun AboutScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(spacing.lg))
             SectionHeader("Build status")
             Text(
-                "Milestone 3 of 10: notes with autosave, pin, favorites, archive, trash, colors, " +
-                    "sorting, undo/redo, and a Markdown editor with preview, find and focus mode. " +
-                    "Features marked with a milestone badge are not built yet.",
+                "Milestone 4 of 10: notes with autosave, Markdown editor, nested folders, tags and " +
+                    "offline full-text search. Features marked with a milestone badge are not built yet.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

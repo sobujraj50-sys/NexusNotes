@@ -74,21 +74,118 @@ abstract class NoteDao {
     @Query("UPDATE notes SET deletedAt = NULL WHERE id = :id")
     abstract suspend fun restore(id: String): Int
 
-    /** Only notes already in Trash can be deleted permanently. */
     @Query("DELETE FROM notes WHERE id = :id AND deletedAt IS NOT NULL")
-    abstract suspend fun deletePermanently(id: String): Int
+    abstract suspend fun deleteTrashedRow(id: String): Int
+
+    @Query("DELETE FROM note_tags WHERE noteId = :id AND EXISTS (SELECT 1 FROM notes WHERE id = :id AND deletedAt IS NOT NULL)")
+    abstract suspend fun deleteTagLinksOfTrashed(id: String): Int
 
     @Query("DELETE FROM notes WHERE deletedAt IS NOT NULL")
-    abstract suspend fun emptyTrash(): Int
+    abstract suspend fun deleteAllTrashedRows(): Int
+
+    @Query("DELETE FROM note_tags WHERE noteId IN (SELECT id FROM notes WHERE deletedAt IS NOT NULL)")
+    abstract suspend fun deleteTagLinksOfAllTrashed(): Int
+
+    /** Only notes already in Trash can be deleted permanently. Their tag links go too. */
+    @Transaction
+    open suspend fun deletePermanently(id: String): Int {
+        deleteTagLinksOfTrashed(id)
+        return deleteTrashedRow(id)
+    }
+
+    @Transaction
+    open suspend fun emptyTrash(): Int {
+        deleteTagLinksOfAllTrashed()
+        return deleteAllTrashedRows()
+    }
+
+    // ---------------- Folders ----------------
+
+    @Query("UPDATE notes SET folderId = :folderId WHERE id = :id")
+    abstract suspend fun setFolder(id: String, folderId: String?): Int
+
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE deletedAt IS NULL AND isArchived = 0 AND folderId = :folderId
+        ORDER BY isPinned DESC, updatedAt DESC
+        """,
+    )
+    abstract fun observeInFolder(folderId: String): Flow<List<NoteEntity>>
+
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE deletedAt IS NULL AND isArchived = 0 AND folderId IS NULL
+        ORDER BY isPinned DESC, updatedAt DESC
+        """,
+    )
+    abstract fun observeUnfiled(): Flow<List<NoteEntity>>
+
+    // ---------------- Search ----------------
+
+    /**
+     * Full-text search. [match] is an FTS4 MATCH expression built by SearchQuery (never raw input).
+     * Filters: folder (or Unfiled only), tag, archived. Trash is never searched.
+     */
+    @Query(
+        """
+        SELECT notes.* FROM notes
+        JOIN notes_fts ON notes.rowid = notes_fts.rowid
+        WHERE notes_fts MATCH :match
+          AND notes.deletedAt IS NULL
+          AND (:includeArchived = 1 OR notes.isArchived = 0)
+          AND (:unfiledOnly = 0 OR notes.folderId IS NULL)
+          AND (:folderId IS NULL OR notes.folderId = :folderId)
+          AND (:tagId IS NULL OR notes.id IN (SELECT noteId FROM note_tags WHERE tagId = :tagId))
+        ORDER BY notes.isPinned DESC, notes.updatedAt DESC
+        LIMIT :limit
+        """,
+    )
+    abstract fun search(
+        match: String,
+        folderId: String?,
+        unfiledOnly: Boolean,
+        tagId: String?,
+        includeArchived: Boolean,
+        limit: Int,
+    ): Flow<List<NoteEntity>>
+
+    /** Same filters with no text query (e.g. "all notes tagged X"). */
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE deletedAt IS NULL
+          AND (:includeArchived = 1 OR isArchived = 0)
+          AND (:unfiledOnly = 0 OR folderId IS NULL)
+          AND (:folderId IS NULL OR folderId = :folderId)
+          AND (:tagId IS NULL OR id IN (SELECT noteId FROM note_tags WHERE tagId = :tagId))
+        ORDER BY isPinned DESC, updatedAt DESC
+        LIMIT :limit
+        """,
+    )
+    abstract fun filter(
+        folderId: String?,
+        unfiledOnly: Boolean,
+        tagId: String?,
+        includeArchived: Boolean,
+        limit: Int,
+    ): Flow<List<NoteEntity>>
 
     /** Autosave: create the note on first real content, update it afterwards. Atomic. */
     @Transaction
-    open suspend fun saveContent(id: String, title: String, body: String, now: Long): SaveOutcome {
+    open suspend fun saveContent(
+        id: String,
+        title: String,
+        body: String,
+        now: Long,
+        folderIdForNew: String? = null,
+    ): SaveOutcome {
         val existing = getById(id)
         return when {
             existing == null && title.isBlank() && body.isBlank() -> SaveOutcome.SKIPPED_EMPTY
             existing == null -> {
-                insert(NoteEntity.new(id, title, body, now))
+                insert(NoteEntity.new(id, title, body, now, folderIdForNew))
                 SaveOutcome.CREATED
             }
             existing.deletedAt != null -> SaveOutcome.READ_ONLY
@@ -100,7 +197,10 @@ abstract class NoteDao {
         }
     }
 
-    /** Copies a note under [newId]. Returns false if the source no longer exists. */
+    @Query("INSERT OR IGNORE INTO note_tags (noteId, tagId) SELECT :newId, tagId FROM note_tags WHERE noteId = :sourceId")
+    abstract suspend fun copyTagLinks(sourceId: String, newId: String)
+
+    /** Copies a note (with its folder and tags) under [newId]. Returns false if the source no longer exists. */
     @Transaction
     open suspend fun duplicate(id: String, newId: String, now: Long): Boolean {
         val source = getById(id) ?: return false
@@ -114,6 +214,7 @@ abstract class NoteDao {
                 updatedAt = now,
             ),
         )
+        copyTagLinks(id, newId)
         return true
     }
 }

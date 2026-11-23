@@ -4,7 +4,8 @@
 |---|---|---|---|
 | 2026-11-21 | M1 Foundation | Approved | Built by GitHub Actions (run #3), installed and checked on user's phone |
 | 2026-11-23 | M2 Database + notes | Approved | GitHub build #5 green; all features verified on phone. Build #4 failed: ZIP contained .github (token cannot change workflows) — ZIPs no longer include .github |
-| 2026-11-23 | M3 Markdown editor | Delivered, awaiting build + phone test | 81 JVM tests pass; own parser, no new dependencies |
+| 2026-11-23 | M3 Markdown editor | Approved | All features verified on phone |
+| 2026-11-23 | M4 Folders, tags, search | Delivered, awaiting build + phone test | First DB migration (v1→v2) with backup + startup gate; 100 JVM tests; migration SQL verified on real SQLite |
 
 ## Decisions log
 - Markdown is the canonical note format (avoids lossy rich-text conversion).
@@ -17,3 +18,4 @@
 - M2: empty new notes are never stored; Trash is read-only; flags don't change "last edited".
 - Build & release: ZIP upload to GitHub → Actions builds a signed APK into Releases.
 - M3: Markdown is the single stored format (Nexus Markdown v1); own parser/formatter instead of a library.
+- M4: add-only migration; pre-upgrade DB copy; folders without SQL FK (integrity in DAO transactions); FTS4 external content; search history off by default.

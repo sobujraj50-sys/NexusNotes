@@ -46,7 +46,7 @@ fun PromptLibraryScreen(onNavigate: (String) -> Unit) {
     NexusScreen(
         title = NexusDestination.PromptLibrary.title,
         actions = {
-            IconButton(onClick = { onNavigate(NexusDestination.Search.route) }) {
+            IconButton(onClick = { onNavigate(NexusDestination.Search.createRoute()) }) {
                 Icon(Icons.Filled.Search, contentDescription = "Search")
             }
         },

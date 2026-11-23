@@ -1,6 +1,14 @@
 package com.nexusnotes.feature.editor
 
 import android.app.Activity
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
+import androidx.compose.material3.OutlinedTextField
+import com.nexusnotes.feature.folders.FolderPickerDialog
+import com.nexusnotes.feature.folders.folderTint
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.filled.Edit
@@ -89,6 +97,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nexusnotes.core.design.components.ColorLabelDialog
 import com.nexusnotes.core.design.components.NexusScreen
 import com.nexusnotes.core.design.icons.NexusIcons
 import com.nexusnotes.core.design.theme.NoteLabelColors
@@ -101,7 +110,6 @@ const val EDITOR_TITLE_TAG = "editor_title"
 const val EDITOR_BODY_TAG = "editor_body"
 const val EDITOR_STATUS_TAG = "editor_status"
 
-private val ColorNames = listOf("Violet", "Cyan", "Emerald", "Amber", "Rose", "Sky", "Grey")
 
 @Composable
 fun NoteEditorScreen(
@@ -130,6 +138,8 @@ fun NoteEditorScreen(
     var findIndex by rememberSaveable { mutableIntStateOf(0) }
     var focusMode by rememberSaveable { mutableStateOf(false) }
     var showColorDialog by rememberSaveable { mutableStateOf(false) }
+    var showFolderPicker by rememberSaveable { mutableStateOf(false) }
+    var showAddTag by rememberSaveable { mutableStateOf(false) }
     var showInfoDialog by rememberSaveable { mutableStateOf(false) }
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
     val note = state.note
@@ -305,6 +315,9 @@ fun NoteEditorScreen(
             onFormat = viewModel::format,
             onToggleTask = viewModel::toggleTask,
             onRestore = viewModel::restore,
+            onFolderClick = { showFolderPicker = true },
+            onAddTagClick = { showAddTag = true },
+            onRemoveTag = viewModel::removeTag,
         )
     }
 
@@ -320,6 +333,26 @@ fun NoteEditorScreen(
     }
     if (showInfoDialog && note != null) {
         NoteInfoDialog(state = state, onDismiss = { showInfoDialog = false })
+    }
+    if (showFolderPicker) {
+        FolderPickerDialog(
+            title = "Move note to",
+            tree = state.folderTree,
+            selectedId = state.folderId,
+            noneLabel = "Unfiled",
+            onSelect = {
+                viewModel.setFolder(it)
+                showFolderPicker = false
+            },
+            onDismiss = { showFolderPicker = false },
+        )
+    }
+    if (showAddTag) {
+        AddTagDialog(
+            existing = state.allTags.filter { tag -> state.tags.none { it.id == tag.id } },
+            onAdd = { name, done -> viewModel.addTag(name) { err -> done(err) } },
+            onDismiss = { showAddTag = false },
+        )
     }
     if (showDeleteDialog) {
         AlertDialog(
@@ -352,6 +385,9 @@ private fun EditorContent(
     onFormat: (FormatAction) -> Unit,
     onToggleTask: (Int) -> Unit,
     onRestore: () -> Unit,
+    onFolderClick: () -> Unit,
+    onAddTagClick: () -> Unit,
+    onRemoveTag: (String) -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
     val bodyText = state.body.text
@@ -434,6 +470,14 @@ private fun EditorContent(
                 style = MaterialTheme.typography.labelMedium,
                 color = if (state.saveState == SaveState.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag(EDITOR_STATUS_TAG),
+            )
+        }
+        if (!previewMode) {
+            OrganizeChips(
+                state = state,
+                onFolderClick = onFolderClick,
+                onAddTagClick = onAddTagClick,
+                onRemoveTag = onRemoveTag,
             )
         }
         HorizontalDivider(Modifier.padding(top = spacing.sm), color = MaterialTheme.colorScheme.outlineVariant)
@@ -676,54 +720,6 @@ private fun FocusModeEditor(
 }
 
 @Composable
-private fun ColorLabelDialog(
-    selected: Int?,
-    onSelect: (Int?) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val spacing = MaterialTheme.spacing
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Color label") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
-                val options: List<Int?> = listOf<Int?>(null) + NoteLabelColors.indices.toList()
-                options.chunked(4).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                        row.forEach { index -> ColorSwatch(index, selected == index) { onSelect(index) } }
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-    )
-}
-
-@Composable
-private fun ColorSwatch(index: Int?, isSelected: Boolean, onClick: () -> Unit) {
-    val color = index?.let { NoteLabelColors[it] }
-    val name = index?.let { ColorNames.getOrElse(it) { "Color ${it + 1}" } } ?: "No color"
-    Box(
-        modifier = Modifier
-            .size(44.dp)
-            .border(
-                width = if (isSelected) 3.dp else 1.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
-                shape = CircleShape,
-            )
-            .padding(4.dp)
-            .background(color ?: Color.Transparent, CircleShape)
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = if (isSelected) "$name, selected" else name },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (color == null) {
-            Icon(Icons.Filled.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
 private fun NoteInfoDialog(state: EditorUiState, onDismiss: () -> Unit) {
     val note = state.note ?: return
     val format = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
@@ -743,5 +739,126 @@ private fun NoteInfoDialog(state: EditorUiState, onDismiss: () -> Unit) {
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
+    )
+}
+
+const val EDITOR_FOLDER_CHIP_TAG = "editor_folder_chip"
+const val EDITOR_ADD_TAG_TAG = "editor_add_tag"
+
+@Composable
+private fun OrganizeChips(
+    state: EditorUiState,
+    onFolderClick: () -> Unit,
+    onAddTagClick: () -> Unit,
+    onRemoveTag: (String) -> Unit,
+) {
+    val spacing = MaterialTheme.spacing
+    val enabled = !state.isReadOnly
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = spacing.lg),
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AssistChip(
+            onClick = onFolderClick,
+            enabled = enabled,
+            label = { Text(state.folder?.name ?: "Unfiled", maxLines = 1) },
+            leadingIcon = {
+                Icon(
+                    NexusIcons.Folder,
+                    contentDescription = null,
+                    tint = folderTint(state.folder?.colorIndex),
+                    modifier = Modifier.size(AssistChipDefaults.IconSize),
+                )
+            },
+            modifier = Modifier.testTag(EDITOR_FOLDER_CHIP_TAG),
+        )
+        state.tags.forEach { tag ->
+            InputChip(
+                selected = false,
+                onClick = { if (enabled) onRemoveTag(tag.id) },
+                enabled = enabled,
+                label = { Text("#" + tag.name, maxLines = 1) },
+                trailingIcon = {
+                    if (enabled) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = "Remove tag ${tag.name}",
+                            modifier = Modifier.size(InputChipDefaults.IconSize),
+                        )
+                    }
+                },
+            )
+        }
+        if (enabled && state.isStored) {
+            AssistChip(
+                onClick = onAddTagClick,
+                label = { Text("Tag") },
+                leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
+                modifier = Modifier.testTag(EDITOR_ADD_TAG_TAG),
+            )
+        }
+    }
+}
+
+/** Add a tag: type a new name or pick an existing tag. */
+@Composable
+private fun AddTagDialog(
+    existing: List<com.nexusnotes.domain.model.Tag>,
+    onAdd: (name: String, done: (String?) -> Unit) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by rememberSaveable { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    val suggestions = remember(text, existing) {
+        val q = text.trim().removePrefix("#")
+        existing.filter { q.isEmpty() || it.name.contains(q, ignoreCase = true) }.take(8)
+    }
+    fun submit(name: String) {
+        onAdd(name) { err -> if (err == null) onDismiss() else error = err }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add tag") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = {
+                        text = it
+                        error = null
+                    },
+                    singleLine = true,
+                    label = { Text("Tag name") },
+                    isError = error != null,
+                    supportingText = if (error != null) {
+                        { Text(error.orEmpty()) }
+                    } else {
+                        null
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit(text) }),
+                    modifier = Modifier.focusRequester(focusRequester),
+                )
+                if (suggestions.isNotEmpty()) {
+                    Text("Existing tags", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+                    ) {
+                        suggestions.forEach { tag ->
+                            AssistChip(onClick = { submit(tag.name) }, label = { Text("#" + tag.name) })
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { submit(text) }) { Text("Add") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

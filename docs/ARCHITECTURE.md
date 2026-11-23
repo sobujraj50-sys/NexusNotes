@@ -106,11 +106,11 @@ Room database `nexus.db`, `exportSchema = true`, schemas committed under `app/sc
 
 | Entity | Key columns | Relations / constraints |
 |---|---|---|
-| NoteEntity (**v1, built in M2**) | id, title, body (Markdown), bodyFormatVersion, folderId? (added in M4), colorIndex?, isPinned, isFavorite, isArchived, deletedAt?, createdAt, updatedAt | FK folderId → Folder (SET NULL). Indexes: folderId, updatedAt, (isArchived, deletedAt). Trash = `deletedAt IS NOT NULL` (soft delete). |
-| NoteFtsEntity | title, body | `@Fts4(contentEntity = NoteEntity)`; Room creates sync triggers. Vault notes are never in NoteEntity, so never indexed. |
-| FolderEntity | id, name, parentId?, colorIndex?, sortOrder, createdAt | FK parentId → Folder (CASCADE on delete is NOT used; deleting a folder moves its notes to Unfiled after confirmation). Cycle check in domain before every move. Unique (parentId, name). |
-| TagEntity | id, name | Unique name (case-insensitive, `COLLATE NOCASE`). |
-| NoteTagCrossRef | noteId, tagId | Composite PK; both FKs CASCADE; index on tagId. |
+| NoteEntity (**built: v1 M2, folderId v2 M4**) | id, title, body (Markdown), bodyFormatVersion, folderId?, colorIndex?, isPinned, isFavorite, isArchived, deletedAt?, createdAt, updatedAt | FK folderId → Folder (SET NULL). Indexes: folderId, updatedAt, (isArchived, deletedAt). Trash = `deletedAt IS NOT NULL` (soft delete). |
+| NoteFtsEntity (**built v2**) | title, body | `@Fts4(contentEntity = NoteEntity)`; Room creates sync triggers. Vault notes are never in NoteEntity, so never indexed. |
+| FolderEntity (**built v2**) | id, name, parentId?, colorIndex?, createdAt | No SQL FK; FolderDao deletes subtrees and unfiles their notes in one transaction. FolderTree blocks loops; max depth 8; sibling names unique (case-insensitive, enforced in code). |
+| TagEntity (**built v2**) | id, name | Unique index on name; case-insensitive uniqueness enforced in TagDao. |
+| NoteTagCrossRef (**built v2**) | noteId, tagId | Composite PK; both FKs CASCADE; index on tagId. |
 | AttachmentEntity | id, noteId, type, fileName (internal), displayName, mimeType, sizeBytes, sha256, createdAt | FK noteId CASCADE; files live in `filesDir/attachments/`, never as blobs. |
 | PromptEntity | id, title, template, categoryKey, isFavorite, createdAt, updatedAt | categoryKey = `PromptCategory.name` or custom category id. FTS table for prompts too. |
 | PromptCategoryEntity | id, name, sortOrder | User-defined categories (built-ins come from the enum). |

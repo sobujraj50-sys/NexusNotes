@@ -32,6 +32,12 @@ import com.nexusnotes.feature.vault.VaultScreen
 
 private const val ANIM_MS = 220
 
+private fun optionalString(name: String) = navArgument(name) {
+    type = NavType.StringType
+    nullable = true
+    defaultValue = null
+}
+
 @Composable
 fun NexusNavHost(
     navController: NavHostController,
@@ -67,13 +73,7 @@ fun NexusNavHost(
         }
         composable(
             route = NexusDestination.NoteEditor.route,
-            arguments = listOf(
-                navArgument(ARG_NOTE_ID) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-            ),
+            arguments = listOf(optionalString(ARG_NOTE_ID), optionalString(ARG_FOLDER_ID)),
         ) {
             NoteEditorScreen(
                 onBack = back,
@@ -97,12 +97,18 @@ fun NexusNavHost(
             FolderDetailScreen(
                 folderId = entry.arguments?.getString(ARG_FOLDER_ID).orEmpty(),
                 onOpenNote = openNote,
+                onNewNote = { folderId -> navigate(NexusDestination.NoteEditor.createRoute(folderId = folderId)) },
                 onNavigate = navigate,
                 onBack = back,
             )
         }
-        composable(NexusDestination.Tags.route) { TagsScreen(onBack = back) }
-        composable(NexusDestination.Search.route) { SearchScreen(onBack = back) }
+        composable(NexusDestination.Tags.route) {
+            TagsScreen(onOpenTag = { tagId -> navigate(NexusDestination.Search.createRoute(tagId = tagId)) }, onBack = back)
+        }
+        composable(
+            route = NexusDestination.Search.route,
+            arguments = listOf(optionalString(ARG_TAG_ID), optionalString(ARG_FOLDER_ID)),
+        ) { SearchScreen(onOpenNote = openNote, onBack = back) }
 
         // Prompts
         composable(

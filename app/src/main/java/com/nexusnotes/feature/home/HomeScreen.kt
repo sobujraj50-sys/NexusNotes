@@ -72,7 +72,7 @@ fun HomeScreen(
         title = NexusDestination.Home.title,
         modifier = modifier,
         actions = {
-            IconButton(onClick = { onNavigate(NexusDestination.Search.route) }) {
+            IconButton(onClick = { onNavigate(NexusDestination.Search.createRoute()) }) {
                 Icon(Icons.Filled.Search, contentDescription = "Search")
             }
         },
@@ -112,7 +112,7 @@ fun HomeScreen(
             item(key = "search") {
                 SearchLauncher(
                     placeholder = "Search notes and prompts",
-                    onClick = { onNavigate(NexusDestination.Search.route) },
+                    onClick = { onNavigate(NexusDestination.Search.createRoute()) },
                 )
             }
             item(key = "quick_actions") {
@@ -165,11 +165,16 @@ fun HomeScreen(
                 }
             }
             item(key = "collections") {
-                DashboardSection("Collections") {
+                DashboardSection("Folders & collections") {
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
+                        state.topFolders.forEach { node ->
+                            CollectionChip(node.folder.name, NexusIcons.Folder) {
+                                onNavigate(NexusDestination.FolderDetail.createRoute(node.folder.id))
+                            }
+                        }
                         CollectionChip("All notes", NexusIcons.Note) { onNavigate(NexusDestination.AllNotes.route) }
                         CollectionChip("Unfiled", NexusIcons.Folder) {
                             onNavigate(NexusDestination.FolderDetail.createRoute(com.nexusnotes.navigation.UNFILED_FOLDER_ID))

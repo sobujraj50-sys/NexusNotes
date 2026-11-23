@@ -35,6 +35,19 @@ class NexusDestinationTest {
     }
 
     @Test
+    fun editorRouteWithFolder() {
+        assertEquals("editor?folderId=f1", NexusDestination.NoteEditor.createRoute(folderId = "f1"))
+        assertEquals("editor?noteId=n1&folderId=f1", NexusDestination.NoteEditor.createRoute("n1", "f1"))
+    }
+
+    @Test
+    fun searchRouteBuilder() {
+        assertEquals("search", NexusDestination.Search.createRoute())
+        assertEquals("search?tagId=t1", NexusDestination.Search.createRoute(tagId = "t1"))
+        assertEquals("search?folderId=unfiled", NexusDestination.Search.createRoute(folderId = UNFILED_FOLDER_ID))
+    }
+
+    @Test
     fun folderDetailRouteBuilder() {
         assertEquals("folders/unfiled", NexusDestination.FolderDetail.createRoute(UNFILED_FOLDER_ID))
     }

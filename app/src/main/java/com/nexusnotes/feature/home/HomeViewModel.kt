@@ -6,6 +6,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.nexusnotes.appContainer
 import com.nexusnotes.data.repository.NoteRepository
+import com.nexusnotes.data.repository.OrganizationRepository
+import com.nexusnotes.domain.model.FolderNode
 import com.nexusnotes.domain.model.Note
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,16 +19,19 @@ data class HomeUiState(
     val pinned: List<Note> = emptyList(),
     val recent: List<Note> = emptyList(),
     val favorites: List<Note> = emptyList(),
+    val topFolders: List<FolderNode> = emptyList(),
 )
 
-class HomeViewModel(repository: NoteRepository) : ViewModel() {
+class HomeViewModel(repository: NoteRepository, organization: OrganizationRepository) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> = combine(
         repository.observePinned(),
         repository.observeRecent(RECENT_QUERY_LIMIT),
         repository.observeFavorites(),
-    ) { pinned, recent, favorites ->
+        organization.observeFolderTree(),
+    ) { pinned, recent, favorites, folders ->
         HomeUiState(
+            topFolders = folders.filter { it.depth == 0 }.take(8),
             isLoading = false,
             pinned = pinned.take(SECTION_LIMIT),
             // Pinned notes already have their own section above.
@@ -40,7 +45,10 @@ class HomeViewModel(repository: NoteRepository) : ViewModel() {
         private const val RECENT_QUERY_LIMIT = 15
 
         val Factory = viewModelFactory {
-            initializer { HomeViewModel(appContainer().noteRepository) }
+            initializer {
+                val c = appContainer()
+                HomeViewModel(c.noteRepository, c.organizationRepository)
+            }
         }
     }
 }

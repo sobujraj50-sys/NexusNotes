@@ -11,13 +11,18 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.nexusnotes.appContainer
 import com.nexusnotes.core.common.Clock
 import com.nexusnotes.data.repository.NoteRepository
+import com.nexusnotes.data.repository.OrganizationRepository
 import com.nexusnotes.domain.EditHistory
 import com.nexusnotes.domain.EditorSnapshot
 import com.nexusnotes.domain.markdown.FormatAction
 import com.nexusnotes.domain.markdown.MarkdownFormatter
 import com.nexusnotes.domain.markdown.TextEdit
+import com.nexusnotes.domain.model.Folder
+import com.nexusnotes.domain.model.FolderNode
 import com.nexusnotes.domain.model.Note
+import com.nexusnotes.domain.model.Tag
 import com.nexusnotes.domain.model.SaveOutcome
+import com.nexusnotes.navigation.ARG_FOLDER_ID
 import com.nexusnotes.navigation.ARG_NOTE_ID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -53,7 +58,15 @@ data class EditorUiState(
     val saveState: SaveState = SaveState.NEW,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
+    /** Folder chosen for a note that is not stored yet (applied on first save). */
+    val pendingFolderId: String? = null,
+    val folderTree: List<FolderNode> = emptyList(),
+    val tags: List<Tag> = emptyList(),
+    val allTags: List<Tag> = emptyList(),
 ) {
+    val folderId: String? get() = if (note != null) note.folderId else pendingFolderId
+    val folder: Folder? get() = folderId?.let { id -> folderTree.firstOrNull { it.folder.id == id }?.folder }
+
     val isReadOnly: Boolean get() = note?.isInTrash == true
     val isStored: Boolean get() = note != null
 }
@@ -77,6 +90,7 @@ sealed interface EditorEvent {
 class NoteEditorViewModel(
     savedStateHandle: SavedStateHandle,
     private val repository: NoteRepository,
+    private val organization: OrganizationRepository,
     private val appScope: CoroutineScope,
     private val clock: Clock,
 ) : ViewModel() {
@@ -85,7 +99,9 @@ class NoteEditorViewModel(
         ?: savedStateHandle.get<String>(KEY_DRAFT_ID)
         ?: UUID.randomUUID().toString().also { savedStateHandle[KEY_DRAFT_ID] = it }
 
-    private val _uiState = MutableStateFlow(EditorUiState())
+    private val _uiState = MutableStateFlow(
+        EditorUiState(pendingFolderId = savedStateHandle.get<String>(ARG_FOLDER_ID)),
+    )
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     private val _events = Channel<EditorEvent>(Channel.BUFFERED)
@@ -99,6 +115,15 @@ class NoteEditorViewModel(
     private var hasUnsavedChanges = false
 
     init {
+        viewModelScope.launch {
+            organization.observeFolderTree().collect { tree -> _uiState.update { it.copy(folderTree = tree) } }
+        }
+        viewModelScope.launch {
+            organization.observeTagsForNote(noteId).collect { tags -> _uiState.update { it.copy(tags = tags) } }
+        }
+        viewModelScope.launch {
+            organization.observeTags().collect { tags -> _uiState.update { it.copy(allTags = tags) } }
+        }
         viewModelScope.launch {
             val stored = repository.getNote(noteId)
             val title = stored?.title.orEmpty()
@@ -199,6 +224,28 @@ class NoteEditorViewModel(
 
     fun restore() = withStoredNote { repository.restore(it.id) }
 
+    /** Moves the note to [folderId] (null = Unfiled). For an unsaved note the choice is applied on first save. */
+    fun setFolder(folderId: String?) {
+        val note = _uiState.value.note
+        if (note == null) {
+            _uiState.update { it.copy(pendingFolderId = folderId) }
+        } else {
+            appScope.launch { repository.setFolder(note.id, folderId) }
+        }
+    }
+
+    /** Adds a tag by name (created if new). Reports a user-facing error or null. */
+    fun addTag(name: String, onResult: (String?) -> Unit) {
+        val note = _uiState.value.note
+        if (note == null) {
+            onResult("Write something first — tags can be added once the note is saved.")
+            return
+        }
+        viewModelScope.launch { onResult(organization.addTagToNote(note.id, name).exceptionOrNull()?.message) }
+    }
+
+    fun removeTag(tagId: String) = withStoredNote { organization.removeTagFromNote(it.id, tagId) }
+
     fun moveToTrash() {
         viewModelScope.launch {
             saveJob?.cancel()
@@ -277,7 +324,7 @@ class NoteEditorViewModel(
             _uiState.update { it.copy(saveState = SaveState.SAVING) }
             val result = runCatching {
                 withContext(NonCancellable) {
-                    repository.saveContent(noteId, state.title.text, state.body.text)
+                    repository.saveContent(noteId, state.title.text, state.body.text, state.pendingFolderId)
                 }
             }
             val newState = result.fold(
@@ -304,6 +351,7 @@ class NoteEditorViewModel(
                 NoteEditorViewModel(
                     savedStateHandle = createSavedStateHandle(),
                     repository = container.noteRepository,
+                    organization = container.organizationRepository,
                     appScope = container.applicationScope,
                     clock = container.clock,
                 )

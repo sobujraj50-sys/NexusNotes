@@ -56,7 +56,7 @@ fun AllNotesScreen(
         title = title,
         onBack = onBack,
         actions = {
-            IconButton(onClick = { onNavigate(NexusDestination.Search.route) }) {
+            IconButton(onClick = { onNavigate(NexusDestination.Search.createRoute()) }) {
                 Icon(Icons.Filled.Search, contentDescription = "Search")
             }
             Box {
