@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Nexus Notes</string>
     <string name="share_to_notes">Save to Nexus Notes</string>
+    <string name="widget_description">Pinned and recent notes, with a quick New note button</string>
+    <string name="widget_new_note">New note</string>
 </resources>

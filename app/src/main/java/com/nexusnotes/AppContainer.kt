@@ -18,6 +18,14 @@ import com.nexusnotes.data.repository.OfflineNoteRepository
 import com.nexusnotes.data.repository.OrganizationRepository
 import com.nexusnotes.data.repository.PromptRepository
 import com.nexusnotes.data.repository.SettingsRepository
+import com.nexusnotes.data.repository.ReminderRepository
+import com.nexusnotes.data.repository.TemplateRepository
+import com.nexusnotes.core.backup.AutoBackupScheduler
+import com.nexusnotes.core.reminders.ReminderAlarms
+import com.nexusnotes.core.widget.NotesWidget
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import com.nexusnotes.data.repository.VaultRepository
 import com.nexusnotes.core.security.BiometricKey
 import com.nexusnotes.core.security.FileVaultMetaStore
@@ -69,7 +77,9 @@ class AppContainer(context: Context) {
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext.settingsDataStore) }
 
     val backupRepository: BackupRepository by lazy {
-        BackupRepository(appContext, database, attachmentStore, attachmentRepository, vaultRepository, clock, BuildConfig.VERSION_NAME)
+        BackupRepository(appContext, database, attachmentStore, attachmentRepository, vaultRepository, clock, BuildConfig.VERSION_NAME) {
+            reminderRepository.rearmAll()
+        }
     }
 
     val exportRepository: ExportRepository by lazy {
@@ -77,6 +87,28 @@ class AppContainer(context: Context) {
             backupRepository.record(kind, name, 0, summary, ok)
         }
     }
+
+    val reminderAlarms: ReminderAlarms by lazy { ReminderAlarms(appContext) }
+
+    val reminderRepository: ReminderRepository by lazy { ReminderRepository(database.reminderDao(), reminderAlarms, clock) }
+
+    val templateRepository: TemplateRepository by lazy { TemplateRepository(database.templateDao(), noteRepository, clock) }
+
+    val autoBackupScheduler: AutoBackupScheduler by lazy { AutoBackupScheduler(appContext, settingsRepository) }
+
+    /** Keeps the home-screen widget in step with notes (only does work if a widget exists). */
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    internal fun startWidgetUpdates() {
+        if (widgetJob != null) return
+        widgetJob = applicationScope.launch {
+            combine(noteRepository.observePinned(), noteRepository.observeRecent(8)) { pinned, recent ->
+                (pinned + recent).distinctBy { it.id }.take(4)
+            }.distinctUntilChanged().debounce(500).collect { notes ->
+                runCatching { NotesWidget.render(appContext, notes) }
+            }
+        }
+    }
+    private var widgetJob: kotlinx.coroutines.Job? = null
 
     /** In-memory vault key holder. Locked at process start. */
     val vaultSession = VaultSession(applicationScope)
@@ -112,7 +144,9 @@ suspend fun AppContainer.openDatabase(): Result<Unit> = withContext(Dispatchers.
             runCatching { attachmentRepository.cleanUpFiles() }
             vaultRepository.cleanUpFiles()
             vaultRepository.refresh()
+            runCatching { autoBackupScheduler.syncWithSettings() }
         }
+        startWidgetUpdates()
     }
 }
 

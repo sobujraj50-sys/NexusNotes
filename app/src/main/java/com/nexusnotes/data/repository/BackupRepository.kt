@@ -2,6 +2,7 @@ package com.nexusnotes.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import com.nexusnotes.core.common.Clock
 import com.nexusnotes.core.database.NexusDatabase
@@ -11,6 +12,8 @@ import com.nexusnotes.data.entity.BackupHistoryEntity
 import com.nexusnotes.data.entity.FolderEntity
 import com.nexusnotes.data.entity.NoteEntity
 import com.nexusnotes.data.entity.NoteTagCrossRef
+import com.nexusnotes.data.entity.NoteTemplateEntity
+import com.nexusnotes.data.entity.ReminderEntity
 import com.nexusnotes.data.entity.PromptCategoryEntity
 import com.nexusnotes.data.entity.PromptEntity
 import com.nexusnotes.data.entity.PromptVariableEntity
@@ -18,6 +21,7 @@ import com.nexusnotes.data.entity.PromptVersionEntity
 import com.nexusnotes.data.entity.TagEntity
 import com.nexusnotes.domain.attachment.AttachmentPolicy
 import com.nexusnotes.domain.backup.AttachmentRec
+import com.nexusnotes.domain.backup.AutoBackupPolicy
 import com.nexusnotes.domain.backup.BackupData
 import com.nexusnotes.domain.backup.BackupInvalidException
 import com.nexusnotes.domain.backup.BackupPaths
@@ -30,6 +34,8 @@ import com.nexusnotes.domain.backup.Manifest
 import com.nexusnotes.domain.backup.NoteRec
 import com.nexusnotes.domain.backup.NoteTagRec
 import com.nexusnotes.domain.backup.PromptRec
+import com.nexusnotes.domain.backup.ReminderRec
+import com.nexusnotes.domain.backup.TemplateRec
 import com.nexusnotes.domain.backup.RestoreMode
 import com.nexusnotes.domain.backup.RestorePlanner
 import com.nexusnotes.domain.backup.RestoreStats
@@ -69,6 +75,8 @@ class BackupRepository(
     private val vault: VaultRepository,
     private val clock: Clock,
     private val appVersion: String,
+    /** Re-arms reminder alarms after a restore. */
+    private val afterRestore: suspend () -> Unit = {},
 ) {
     private val appContext = context.applicationContext
     private val resolver = appContext.contentResolver
@@ -140,7 +148,44 @@ class BackupRepository(
         attachments = dao.attachments().map {
             AttachmentRec(it.id, it.noteId, it.kind, it.fileName, it.displayName, it.mimeType, it.sizeBytes, it.sha256, it.durationMs, it.createdAt)
         },
+        templates = dao.templates().map { TemplateRec(it.id, it.name, it.title, it.body, it.createdAt) },
+        reminders = dao.reminders().map { ReminderRec(it.noteId, it.triggerAt, it.repeat, it.anchorAt, it.createdAt) },
     )
+
+    /**
+     * Automatic backup into a folder the user picked once (persisted permission). Vault notes are not
+     * included (they need the backup password). Old automatic copies beyond [keep] are deleted;
+     * manual backups in the same folder are never touched.
+     */
+    suspend fun createAutoBackup(tree: Uri, keep: Int): Result<String> = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            var created: Uri? = null
+            val name = AutoBackupPolicy.fileName(clock.now(), java.time.ZoneId.systemDefault())
+            val result = runCatching {
+                val treeId = DocumentsContract.getTreeDocumentId(tree)
+                val dir = DocumentsContract.buildDocumentUriUsingTree(tree, treeId)
+                val doc = DocumentsContract.createDocument(resolver, dir, "application/zip", name)
+                    ?: error("The backup folder is not available any more. Choose it again in Backup settings.")
+                created = doc
+                resolver.openOutputStream(doc, "wt")!!.use { writeBackup(it, null) }
+                verifyDocument(doc)
+                // Retention: list the folder, delete the oldest automatic backups.
+                val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, treeId)
+                val found = mutableMapOf<String, String>()
+                resolver.query(children, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)?.use { c ->
+                    while (c.moveToNext()) found[c.getString(0)] = c.getString(1)
+                }
+                AutoBackupPolicy.toDelete(found.keys.toList(), keep).forEach { old ->
+                    runCatching { DocumentsContract.deleteDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, found.getValue(old))) }
+                }
+                displayName(doc) ?: name
+            }.onFailure {
+                created?.let { doc -> runCatching { DocumentsContract.deleteDocument(resolver, doc) } }
+            }
+            record("AUTO BACKUP", name, created?.let { sizeOf(it) } ?: 0, result.fold({ "Saved $it" }, { it.message ?: "Failed" }), result.isSuccess)
+            result
+        }
+    }
 
     // ---- verify / inspect -------------------------------------------------------------
 
@@ -236,12 +281,15 @@ class BackupRepository(
                         attachments = d.attachments.map {
                             AttachmentEntity(it.id, it.noteId, it.kind, it.fileName, AttachmentPolicy.safeDisplayName(it.displayName, "file"), it.mimeType, it.sizeBytes, it.sha256, it.durationMs, it.createdAt)
                         },
+                        templates = d.templates.map { NoteTemplateEntity(it.id, it.name.take(80), it.title, it.body, it.createdAt) },
+                        reminders = d.reminders.map { ReminderEntity(it.noteId, it.triggerAt, it.repeat, it.anchorAt, it.createdAt) },
                     )
                 } catch (e: Throwable) {
                     copied.forEach { attachmentStore.delete(it) }
                     throw e
                 }
                 if (mode == RestoreMode.REPLACE) attachments.cleanUpFiles()
+                afterRestore()
 
                 // 3) Vault (optional, separate: normal notes are already safely restored).
                 var vaultAdded = 0
@@ -275,6 +323,8 @@ class BackupRepository(
             attachmentIds = atts.map { it.id }.toSet(),
             attachmentFileNames = atts.map { it.fileName }.toSet() + attachmentStore.directory.list().orEmpty().toSet(),
             versionIds = dao.versions().map { it.id }.toSet(),
+            templateIds = dao.templates().map { it.id }.toSet(),
+            reminderNoteIds = dao.reminders().map { it.noteId }.toSet(),
         )
     }
 

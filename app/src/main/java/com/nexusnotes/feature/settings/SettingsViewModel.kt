@@ -33,6 +33,10 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setDynamicColor(enabled) }
     }
 
+    fun setAiToolsEnabled(enabled: Boolean) {
+        viewModelScope.launch { settings.setAiToolsEnabled(enabled) }
+    }
+
     fun setSaveSearchHistory(enabled: Boolean) {
         viewModelScope.launch { settings.setSaveSearchHistory(enabled) }
     }

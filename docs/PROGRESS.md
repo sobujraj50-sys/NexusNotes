@@ -33,3 +33,6 @@ AES-256-GCM vault with PIN (PBKDF2 + Android Keystore) and biometric unlock, enc
 
 ## Milestone 8 — Backup, Restore & Export (0.8.0-m8) — delivered, awaiting test
 Verified ZIP backups (SHA-256 manifest), optional encrypted vault with backup password, Merge/Replace restore in one transaction with safety copy and undo, TXT/Markdown/JSON/PDF export (all or one note), history, DB v6. Unit tests: 181 pass locally; v1→v6 migration verified on SQLite.
+
+## Milestone 9 — Reminders, templates, widget, quick notes, auto backup, optional AI (0.9.0-m9) — delivered, awaiting test
+AlarmManager reminders with repeat/snooze/boot re-arm, built-in + user templates, launcher shortcuts, RemoteViews widget, JobScheduler automatic backups with retention, offline AI prompt builder (no INTERNET permission), DB v7. Unit tests: 199 pass locally; v1→v7 migration verified on SQLite.

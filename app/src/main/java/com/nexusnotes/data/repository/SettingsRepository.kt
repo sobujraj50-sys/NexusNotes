@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.nexusnotes.domain.model.AppSettings
 import com.nexusnotes.domain.model.NoteSort
@@ -26,6 +27,11 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
                 noteSort = enumOrDefault(prefs[NOTE_SORT], NoteSort.MODIFIED),
                 saveSearchHistory = prefs[SAVE_SEARCH_HISTORY] ?: false,
                 searchHistory = prefs[SEARCH_HISTORY]?.split(HISTORY_SEPARATOR)?.filter { it.isNotBlank() }.orEmpty(),
+                aiToolsEnabled = prefs[AI_TOOLS] ?: false,
+                autoBackupEnabled = prefs[AUTO_BACKUP] ?: false,
+                autoBackupFolder = prefs[AUTO_BACKUP_FOLDER],
+                autoBackupIntervalDays = prefs[AUTO_BACKUP_DAYS] ?: 1,
+                autoBackupKeep = prefs[AUTO_BACKUP_KEEP] ?: 5,
             )
         }
 
@@ -60,6 +66,19 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    suspend fun setAiToolsEnabled(enabled: Boolean) {
+        dataStore.edit { it[AI_TOOLS] = enabled }
+    }
+
+    suspend fun setAutoBackup(enabled: Boolean, folder: String?, intervalDays: Int, keep: Int) {
+        dataStore.edit {
+            it[AUTO_BACKUP] = enabled && folder != null
+            if (folder != null) it[AUTO_BACKUP_FOLDER] = folder else it.remove(AUTO_BACKUP_FOLDER)
+            it[AUTO_BACKUP_DAYS] = intervalDays
+            it[AUTO_BACKUP_KEEP] = keep
+        }
+    }
+
     suspend fun clearSearchHistory() {
         dataStore.edit { it.remove(SEARCH_HISTORY) }
     }
@@ -73,6 +92,11 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val NOTE_SORT = stringPreferencesKey("note_sort")
+        val AI_TOOLS = booleanPreferencesKey("ai_tools_enabled")
+        val AUTO_BACKUP = booleanPreferencesKey("auto_backup_enabled")
+        val AUTO_BACKUP_FOLDER = stringPreferencesKey("auto_backup_folder")
+        val AUTO_BACKUP_DAYS = intPreferencesKey("auto_backup_days")
+        val AUTO_BACKUP_KEEP = intPreferencesKey("auto_backup_keep")
 
         inline fun <reified E : Enum<E>> enumOrDefault(name: String?, default: E): E =
             name?.let { stored -> enumValues<E>().firstOrNull { it.name == stored } } ?: default

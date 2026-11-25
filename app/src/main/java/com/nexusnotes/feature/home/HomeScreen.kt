@@ -124,8 +124,14 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                     )
                     QuickAction(
+                        icon = NexusIcons.Copy,
+                        label = "Template",
+                        onClick = { onNavigate(NexusDestination.Templates.route) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickAction(
                         icon = NexusIcons.Sparkle,
-                        label = "New prompt",
+                        label = "Prompt",
                         onClick = { onNavigate(NexusDestination.PromptEditor.createRoute()) },
                         modifier = Modifier.weight(1f),
                     )

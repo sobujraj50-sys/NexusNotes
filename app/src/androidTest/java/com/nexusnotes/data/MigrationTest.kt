@@ -105,6 +105,14 @@ class MigrationTest {
             // Backup history table exists (v6).
             db.backupDao().insertHistory(com.nexusnotes.data.entity.BackupHistoryEntity("h1", 1, "BACKUP", "b.zip", 10, "ok", true))
 
+            // Reminders (v7) cascade with their note; templates table exists.
+            db.templateDao().upsert(com.nexusnotes.data.entity.NoteTemplateEntity("tp", "T", "t", "b", 1))
+            dao.saveContent("r1", "Remind", "x", 1, null)
+            db.reminderDao().upsert(com.nexusnotes.data.entity.ReminderEntity("r1", 5, "NONE", 5, 1))
+            dao.moveToTrash("r1", 2)
+            dao.deletePermanently("r1")
+            assertEquals(null, db.reminderDao().get("r1"))
+
             // The index follows later edits (sync triggers exist).
             dao.updateContent("a", "Shopping list", "eggs", 50)
             assertEquals(0, dao.search("\"milk*\"", null, false, null, false, 50).first().size)

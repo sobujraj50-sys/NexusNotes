@@ -30,12 +30,16 @@ import com.nexusnotes.core.database.CrashReportDialog
 import com.nexusnotes.core.database.DatabaseErrorScreen
 import com.nexusnotes.core.database.DatabaseState
 import com.nexusnotes.navigation.NexusNotesRoot
+import com.nexusnotes.navigation.NexusDestination
+import com.nexusnotes.core.reminders.ReminderAlarms
+import com.nexusnotes.core.widget.NotesWidget
+import com.nexusnotes.domain.template.NoteTemplates
 
 class MainActivity : ComponentActivity() {
 
-    /** Notes to open (e.g. one just created from shared content). */
-    private val openNoteRequests = Channel<String>(Channel.BUFFERED)
-    private val openNoteFlow = openNoteRequests.receiveAsFlow()
+    /** Screens to open from outside: shared content, notifications, widget, launcher shortcuts. */
+    private val routeRequests = Channel<String>(Channel.BUFFERED)
+    private val routeFlow = routeRequests.receiveAsFlow()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -43,7 +47,7 @@ class MainActivity : ComponentActivity() {
         val container = (application as NexusNotesApp).container
         val settingsFlow = container.settingsRepository.settings
         // A share is handled once; after rotation/recreation the saved state is non-null.
-        if (savedInstanceState == null) handleShare(intent)
+        if (savedInstanceState == null) handleIntent(intent)
 
         setContent {
             val settings by settingsFlow.collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -72,7 +76,7 @@ class MainActivity : ComponentActivity() {
                 }
                 when (val state = dbState) {
                     DatabaseState.Opening -> Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
-                    DatabaseState.Ready -> NexusNotesRoot(openNoteRequests = openNoteFlow)
+                    DatabaseState.Ready -> NexusNotesRoot(openRoutes = routeFlow)
                     is DatabaseState.Failed -> DatabaseErrorScreen(state.error)
                 }
                 CrashReportDialog()
@@ -83,7 +87,26 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleShare(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        intent ?: return
+        val container = (application as NexusNotesApp).container
+        when (intent.action) {
+            ReminderAlarms.ACTION_OPEN_NOTE -> ReminderAlarms.noteIdFrom(intent)?.let { id ->
+                ReminderAlarms.dismiss(this, id)
+                routeRequests.trySend(NexusDestination.NoteEditor.createRoute(id))
+            }
+            NotesWidget.ACTION_NEW_NOTE, AppShortcuts.ACTION_QUICK_NOTE -> routeRequests.trySend(NexusDestination.NoteEditor.createRoute())
+            AppShortcuts.ACTION_SEARCH -> routeRequests.trySend(NexusDestination.Search.createRoute())
+            AppShortcuts.ACTION_CHECKLIST -> container.applicationScope.launch {
+                if (container.openDatabase().isFailure) return@launch
+                val id = container.templateRepository.createNote(NoteTemplates.builtIns.first { it.id == "builtin:checklist" })
+                routeRequests.send(NexusDestination.NoteEditor.createRoute(id))
+            }
+            else -> handleShare(intent)
+        }
     }
 
     /** Turns text/files shared from another app into a new note, then opens it. */
@@ -104,7 +127,7 @@ class MainActivity : ComponentActivity() {
                     ).show()
                 }
             }
-            openNoteRequests.send(result.noteId)
+            routeRequests.send(NexusDestination.NoteEditor.createRoute(result.noteId))
         }
     }
 

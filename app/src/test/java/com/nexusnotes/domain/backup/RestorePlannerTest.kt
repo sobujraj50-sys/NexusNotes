@@ -24,6 +24,8 @@ class RestorePlannerTest {
         prompts = listOf(PromptRec("p1", "P", "t", "writing", false, 1, 1)),
         variables = listOf(VariableRec("p1", "x", "")),
         versions = listOf(VersionRec("v1", "p1", "P", "t", 1)),
+        templates = listOf(TemplateRec("tp1", "Daily", "t", "b", 1)),
+        reminders = listOf(ReminderRec("a", 1, "NONE", 1, 1), ReminderRec("b", 2, "DAILY", 2, 1)),
     )
 
     @Test fun mergeIntoEmptyAddsEverything() {
@@ -95,5 +97,20 @@ class RestorePlannerTest {
         val b = BackupData(folders = listOf(FolderRec("x", "X", "y", null, 1), FolderRec("y", "Y", "x", null, 1)))
         val plan = planner.plan(b, ExistingData(), RestoreMode.MERGE)
         assertTrue(plan.insert.folders.all { it.parentId == null })
+    }
+
+    @Test fun remindersFollowTheirNotes() {
+        val existing = ExistingData(
+            notes = mapOf("a" to note("a"), "b" to note("b", "Mine", 9)),
+            templateIds = setOf("tp1"),
+        )
+        val plan = planner.plan(backup, existing, RestoreMode.MERGE)
+        // "a" skipped as duplicate → its reminder too; "b" copied → reminder moves to the copy.
+        val copy = plan.insert.notes.single { it.title == "Changed (restored)" }
+        assertEquals(listOf(copy.id), plan.insert.reminders.map { it.noteId })
+        assertTrue(plan.insert.templates.isEmpty())
+        val fresh = planner.plan(backup, ExistingData(), RestoreMode.MERGE)
+        assertEquals(1, fresh.insert.templates.size)
+        assertEquals(2, fresh.insert.reminders.size)
     }
 }

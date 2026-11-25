@@ -43,7 +43,48 @@ class BackupViewModel(
     private val backups: BackupRepository,
     private val exports: ExportRepository,
     private val vault: VaultRepository,
+    private val settings: com.nexusnotes.data.repository.SettingsRepository,
+    private val scheduler: com.nexusnotes.core.backup.AutoBackupScheduler,
+    private val resolver: android.content.ContentResolver,
 ) : ViewModel() {
+
+    val appSettings: StateFlow<com.nexusnotes.domain.model.AppSettings> =
+        settings.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.nexusnotes.domain.model.AppSettings())
+
+    /** Folder picked for automatic backups: keep access across restarts, then turn it on. */
+    fun setAutoBackupFolder(tree: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                resolver.takePersistableUriPermission(
+                    tree,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            val s = appSettings.value
+            settings.setAutoBackup(true, tree.toString(), s.autoBackupIntervalDays, s.autoBackupKeep)
+            scheduler.syncWithSettings()
+            report("Automatic backup is on", true, "Folder: " + (backups.displayName(tree) ?: tree.lastPathSegment ?: "chosen folder"),
+                "Runs about every ${if (s.autoBackupIntervalDays == 1) "day" else "${s.autoBackupIntervalDays} days"} when the battery isn't low.",
+                "Vault notes are not included in automatic backups (they need your backup password).")
+        }
+    }
+
+    fun setAutoBackupOptions(enabled: Boolean, intervalDays: Int, keep: Int) {
+        viewModelScope.launch {
+            val s = appSettings.value
+            settings.setAutoBackup(enabled, s.autoBackupFolder, intervalDays, keep)
+            scheduler.syncWithSettings()
+        }
+    }
+
+    fun runAutoBackupNow() {
+        val folder = appSettings.value.autoBackupFolder ?: return
+        run("Creating automatic backup…") {
+            backups.createAutoBackup(Uri.parse(folder), appSettings.value.autoBackupKeep)
+                .onSuccess { report("Backup saved", true, it, "Older automatic backups beyond ${appSettings.value.autoBackupKeep} were removed.") }
+                .onFailure { report("Automatic backup failed", false, it.message ?: "Unknown error") }
+        }
+    }
     private val _state = MutableStateFlow(BackupUiState(hasSafetyCopy = backups.hasSafetyCopy()))
     val state: StateFlow<BackupUiState> = _state.asStateFlow()
 
@@ -182,7 +223,7 @@ class BackupViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val c = appContainer()
-                BackupViewModel(c.backupRepository, c.exportRepository, c.vaultRepository)
+                BackupViewModel(c.backupRepository, c.exportRepository, c.vaultRepository, c.settingsRepository, c.autoBackupScheduler, c.contentResolver)
             }
         }
     }

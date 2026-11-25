@@ -29,6 +29,8 @@ import com.nexusnotes.feature.settings.AboutScreen
 import com.nexusnotes.feature.settings.SettingsScreen
 import com.nexusnotes.feature.tags.TagsScreen
 import com.nexusnotes.feature.vault.VaultEditorScreen
+import com.nexusnotes.feature.reminders.RemindersScreen
+import com.nexusnotes.feature.templates.TemplatesScreen
 import com.nexusnotes.feature.vault.VaultScreen
 
 private const val ANIM_MS = 220
@@ -157,6 +159,17 @@ fun NexusNavHost(
             )
         }
         composable(NexusDestination.Backup.route) { BackupScreen(onBack = back) }
+        composable(NexusDestination.Templates.route) {
+            TemplatesScreen(
+                onBack = back,
+                onOpenNote = { id ->
+                    navController.navigate(NexusDestination.NoteEditor.createRoute(id)) {
+                        popUpTo(NexusDestination.Templates.route) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(NexusDestination.Reminders.route) { RemindersScreen(onBack = back, onOpenNote = openNote) }
         composable(NexusDestination.About.route) { AboutScreen(onBack = back) }
     }
 }

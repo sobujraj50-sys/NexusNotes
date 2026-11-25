@@ -34,6 +34,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -102,6 +104,9 @@ class NoteEditorViewModel(
     private val attachments: AttachmentRepository,
     private val vault: com.nexusnotes.data.repository.VaultRepository,
     private val exports: com.nexusnotes.data.repository.ExportRepository,
+    private val reminders: com.nexusnotes.data.repository.ReminderRepository,
+    private val templates: com.nexusnotes.data.repository.TemplateRepository,
+    settings: com.nexusnotes.data.repository.SettingsRepository,
     private val appScope: CoroutineScope,
     private val clock: Clock,
 ) : ViewModel() {
@@ -318,6 +323,42 @@ class NoteEditorViewModel(
         }
     }
 
+    // ---- Reminder, template, AI ----
+
+    val reminder: StateFlow<com.nexusnotes.domain.reminder.Reminder?> =
+        reminders.observe(noteId).stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), null)
+
+    val aiToolsEnabled: StateFlow<Boolean> = settings.settings.map { it.aiToolsEnabled }
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), false)
+
+    val exactAlarmsAllowed: Boolean get() = reminders.exactAlarmsAllowed
+
+    fun setReminder(at: Long, repeat: com.nexusnotes.domain.reminder.ReminderRepeat) {
+        viewModelScope.launch {
+            saveJob?.cancel()
+            withContext(NonCancellable) { saveNow() }
+            if (repository.getNote(noteId) == null) {
+                _events.send(EditorEvent.Message("Write something first, then set a reminder."))
+                return@launch
+            }
+            runCatching { reminders.set(noteId, at, repeat) }
+                .onSuccess { _events.send(EditorEvent.Message("Reminder set.")) }
+                .onFailure { _events.send(EditorEvent.Message(it.message ?: "Could not set the reminder.")) }
+        }
+    }
+
+    fun removeReminder() {
+        appScope.launch { reminders.remove(noteId) }
+    }
+
+    fun saveAsTemplate(name: String) {
+        viewModelScope.launch {
+            val s = _uiState.value
+            templates.saveFromNote(name, s.title.text, s.body.text)
+            _events.send(EditorEvent.Message("Saved as template “${name.trim().ifBlank { "My template" }}”."))
+        }
+    }
+
     // ---- Export ----
 
     fun exportNote(format: com.nexusnotes.domain.backup.ExportFormat, target: android.net.Uri) {
@@ -460,6 +501,9 @@ class NoteEditorViewModel(
                     attachments = container.attachmentRepository,
                     vault = container.vaultRepository,
                     exports = container.exportRepository,
+                    reminders = container.reminderRepository,
+                    templates = container.templateRepository,
+                    settings = container.settingsRepository,
                     appScope = container.applicationScope,
                     clock = container.clock,
                 )

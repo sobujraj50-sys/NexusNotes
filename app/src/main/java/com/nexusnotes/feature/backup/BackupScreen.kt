@@ -26,6 +26,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -52,6 +53,8 @@ import com.nexusnotes.core.design.components.NexusScreen
 import com.nexusnotes.core.design.components.SectionHeader
 import com.nexusnotes.core.design.icons.NexusIcons
 import com.nexusnotes.core.design.theme.spacing
+import android.net.Uri
+import com.nexusnotes.domain.backup.AutoBackupPolicy
 import com.nexusnotes.domain.backup.ExportFormat
 import com.nexusnotes.domain.backup.Manifest
 import com.nexusnotes.domain.backup.RestoreMode
@@ -73,6 +76,8 @@ fun BackupScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val vaultSetUp by viewModel.vaultSetUp.collectAsStateWithLifecycle()
     val vaultUnlocked by viewModel.vaultUnlocked.collectAsStateWithLifecycle()
+    val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri -> uri?.let(viewModel::setAutoBackupFolder) }
 
     var showBackupOptions by rememberSaveable { mutableStateOf(false) }
     var pendingVaultPassword by remember { mutableStateOf<String?>(null) }
@@ -158,6 +163,61 @@ fun BackupScreen(
                     supporting = "Verifies every part without restoring",
                     onClick = if (enabled) ({ viewModel.beforePicker(); openForVerify.launch(backupTypes) }) else null,
                 )
+            }
+
+            item { SectionHeader("Automatic backup", Modifier.padding(top = spacing.md)) }
+            item {
+                val folder = appSettings.autoBackupFolder
+                Column(Modifier.fillMaxWidth().padding(vertical = spacing.xs), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Back up automatically", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                if (folder == null) "Choose a folder once; backups then run in the background." else "Into: " + Uri.decode(folder).substringAfterLast(':').ifBlank { "chosen folder" },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = appSettings.autoBackupEnabled,
+                            enabled = enabled,
+                            onCheckedChange = { on ->
+                                if (on && folder == null) { viewModel.beforePicker(); pickFolder.launch(null) } else {
+                                    viewModel.setAutoBackupOptions(on, appSettings.autoBackupIntervalDays, appSettings.autoBackupKeep)
+                                }
+                            },
+                        )
+                    }
+                    if (appSettings.autoBackupEnabled) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AutoBackupPolicy.INTERVAL_DAYS_OPTIONS.forEach { d ->
+                                FilterChip(
+                                    selected = appSettings.autoBackupIntervalDays == d,
+                                    onClick = { viewModel.setAutoBackupOptions(true, d, appSettings.autoBackupKeep) },
+                                    label = { Text(if (d == 1) "Daily" else "Weekly") },
+                                )
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AutoBackupPolicy.KEEP_OPTIONS.forEach { k ->
+                                FilterChip(
+                                    selected = appSettings.autoBackupKeep == k,
+                                    onClick = { viewModel.setAutoBackupOptions(true, appSettings.autoBackupIntervalDays, k) },
+                                    label = { Text("Keep $k") },
+                                )
+                            }
+                        }
+                        Row {
+                            TextButton(onClick = { viewModel.runAutoBackupNow() }, enabled = enabled) { Text("Back up now") }
+                            TextButton(onClick = { viewModel.beforePicker(); pickFolder.launch(null) }, enabled = enabled) { Text("Change folder") }
+                        }
+                        Text(
+                            "Vault notes are not in automatic backups. Use Create backup with a password for those.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
 
             item { SectionHeader("Restore", Modifier.padding(top = spacing.md)) }

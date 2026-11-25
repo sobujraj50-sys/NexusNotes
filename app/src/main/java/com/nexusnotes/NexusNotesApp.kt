@@ -12,6 +12,7 @@ class NexusNotesApp : Application() {
         super.onCreate()
         CrashReporter.install(this, BuildConfig.VERSION_NAME)
         container = AppContainer(this)
+        AppShortcuts.publish(this)
         registerActivityLifecycleCallbacks(
             VaultAutoLock(
                 session = container.vaultSession,

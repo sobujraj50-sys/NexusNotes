@@ -25,6 +25,8 @@ data class AttachmentRec(
     val id: String, val noteId: String, val kind: String, val fileName: String, val displayName: String,
     val mimeType: String, val sizeBytes: Long, val sha256: String, val durationMs: Long?, val createdAt: Long,
 )
+data class TemplateRec(val id: String, val name: String, val title: String, val body: String, val createdAt: Long)
+data class ReminderRec(val noteId: String, val triggerAt: Long, val repeat: String, val anchorAt: Long, val createdAt: Long)
 /** Vault rows stay encrypted (Base64 of the AES-GCM payload). */
 data class VaultItemRec(val id: String, val payload: String, val createdAt: Long, val updatedAt: Long)
 data class VaultAttachmentRec(val id: String, val itemId: String, val fileName: String, val payload: String, val createdAt: Long)
@@ -44,6 +46,8 @@ data class BackupData(
     val vaultItems: List<VaultItemRec> = emptyList(),
     val vaultAttachments: List<VaultAttachmentRec> = emptyList(),
     val vaultKey: VaultKeyRec? = null,
+    val templates: List<TemplateRec> = emptyList(),
+    val reminders: List<ReminderRec> = emptyList(),
 ) {
     val includesVault: Boolean get() = vaultKey != null
 
@@ -55,6 +59,8 @@ data class BackupData(
         "attachments" to attachments.size.toLong(),
         "vaultNotes" to vaultItems.size.toLong(),
         "vaultFiles" to vaultAttachments.size.toLong(),
+        "templates" to templates.size.toLong(),
+        "reminders" to reminders.size.toLong(),
     )
 }
 
@@ -108,6 +114,10 @@ object BackupJson {
             "vaultAttachments" to d.vaultAttachments.map {
                 mapOf("id" to it.id, "itemId" to it.itemId, "fileName" to it.fileName, "payload" to it.payload, "createdAt" to it.createdAt)
             },
+            "templates" to d.templates.map { mapOf("id" to it.id, "name" to it.name, "title" to it.title, "body" to it.body, "createdAt" to it.createdAt) },
+            "reminders" to d.reminders.map {
+                mapOf("noteId" to it.noteId, "triggerAt" to it.triggerAt, "repeat" to it.repeat, "anchorAt" to it.anchorAt, "createdAt" to it.createdAt)
+            },
             "vaultKey" to d.vaultKey?.let { mapOf("salt" to it.salt, "iterations" to it.iterations, "wrapped" to it.wrapped) },
         ),
     )
@@ -140,6 +150,10 @@ object BackupJson {
             vaultItems = root.list("vaultItems") { VaultItemRec(it.str("id"), it.str("payload"), it.long("createdAt"), it.long("updatedAt")) },
             vaultAttachments = root.list("vaultAttachments") {
                 VaultAttachmentRec(it.str("id"), it.str("itemId"), it.str("fileName"), it.str("payload"), it.long("createdAt"))
+            },
+            templates = root.list("templates") { TemplateRec(it.str("id"), it.str("name"), it.str("title"), it.str("body"), it.long("createdAt")) },
+            reminders = root.list("reminders") {
+                ReminderRec(it.str("noteId"), it.long("triggerAt"), it.str("repeat"), it.long("anchorAt"), it.long("createdAt"))
             },
             vaultKey = (root["vaultKey"] as? Map<*, *>)?.let {
                 @Suppress("UNCHECKED_CAST")

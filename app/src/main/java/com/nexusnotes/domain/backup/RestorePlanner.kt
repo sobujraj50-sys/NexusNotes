@@ -18,6 +18,8 @@ data class ExistingData(
     val attachmentIds: Set<String> = emptySet(),
     val attachmentFileNames: Set<String> = emptySet(),
     val versionIds: Set<String> = emptySet(),
+    val templateIds: Set<String> = emptySet(),
+    val reminderNoteIds: Set<String> = emptySet(),
 )
 
 /** A file to copy from the archive into app storage under [targetName]. */
@@ -155,6 +157,13 @@ class RestorePlanner(private val newId: () -> String) {
             v.copy(id = id, promptId = prompt)
         }
 
+        // Templates by id; reminders follow their note (one per note, existing ones win).
+        val templates = backup.templates.filter { it.id !in ex.templateIds }
+        val reminders = backup.reminders.mapNotNull { r ->
+            val note = noteIdMap[r.noteId] ?: return@mapNotNull null
+            if (note in ex.reminderNoteIds) null else r.copy(noteId = note)
+        }.distinctBy { it.noteId }
+
         return RestorePlan(
             mode = mode,
             insert = BackupData(
@@ -167,6 +176,8 @@ class RestorePlanner(private val newId: () -> String) {
                 variables = variables,
                 versions = versions,
                 attachments = attachments,
+                templates = templates,
+                reminders = reminders,
             ),
             files = files,
             stats = stats,

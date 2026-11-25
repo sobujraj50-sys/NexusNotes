@@ -15,7 +15,7 @@ class NexusDestinationTest {
     @Test
     fun allDestinationsAreRegisteredAndNonNull() {
         // Guards against the sealed-class initialization-order bug (null entries).
-        assertEquals(18, NexusDestinations.all.size)
+        assertEquals(20, NexusDestinations.all.size)
         assertTrue(NexusDestinations.all.all { it.route.isNotBlank() && it.title.isNotBlank() })
     }
 

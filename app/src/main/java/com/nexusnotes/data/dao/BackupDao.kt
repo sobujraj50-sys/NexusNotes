@@ -10,6 +10,8 @@ import com.nexusnotes.data.entity.BackupHistoryEntity
 import com.nexusnotes.data.entity.FolderEntity
 import com.nexusnotes.data.entity.NoteEntity
 import com.nexusnotes.data.entity.NoteTagCrossRef
+import com.nexusnotes.data.entity.NoteTemplateEntity
+import com.nexusnotes.data.entity.ReminderEntity
 import com.nexusnotes.data.entity.PromptCategoryEntity
 import com.nexusnotes.data.entity.PromptEntity
 import com.nexusnotes.data.entity.PromptVariableEntity
@@ -29,6 +31,12 @@ abstract class BackupDao {
     @Query("SELECT * FROM prompt_variables") abstract suspend fun variables(): List<PromptVariableEntity>
     @Query("SELECT * FROM prompt_versions") abstract suspend fun versions(): List<PromptVersionEntity>
     @Query("SELECT * FROM attachments") abstract suspend fun attachments(): List<AttachmentEntity>
+
+    @Query("SELECT * FROM note_templates") abstract suspend fun templates(): List<NoteTemplateEntity>
+    @Query("SELECT * FROM reminders") abstract suspend fun reminders(): List<ReminderEntity>
+    @Insert(onConflict = OnConflictStrategy.IGNORE) abstract suspend fun insertTemplates(items: List<NoteTemplateEntity>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) abstract suspend fun insertReminders(items: List<ReminderEntity>)
+    @Query("DELETE FROM note_templates") abstract suspend fun clearTemplates()
 
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertNotes(items: List<NoteEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertFolders(items: List<FolderEntity>)
@@ -66,8 +74,11 @@ abstract class BackupDao {
         variables: List<PromptVariableEntity>,
         versions: List<PromptVersionEntity>,
         attachments: List<AttachmentEntity>,
+        templates: List<NoteTemplateEntity>,
+        reminders: List<ReminderEntity>,
     ) {
         if (replace) {
+            clearTemplates() // reminders go with their notes (foreign key cascade)
             clearNoteTags()
             clearAttachments()
             clearNotes()
@@ -87,6 +98,8 @@ abstract class BackupDao {
         insertVariables(variables)
         insertVersions(versions)
         insertAttachments(attachments)
+        insertTemplates(templates)
+        insertReminders(reminders)
     }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun insertHistory(entry: BackupHistoryEntity)

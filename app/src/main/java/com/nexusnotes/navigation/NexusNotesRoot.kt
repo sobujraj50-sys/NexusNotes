@@ -34,10 +34,10 @@ fun bottomNavTag(destination: TopLevelDestination): String = "bottom_nav_${desti
 /** Root composable: bottom navigation (top-level screens only) + navigation host. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NexusNotesRoot(openNoteRequests: Flow<String> = emptyFlow()) {
+fun NexusNotesRoot(openRoutes: Flow<String> = emptyFlow()) {
     val navController = rememberNavController()
-    LaunchedEffect(navController, openNoteRequests) {
-        openNoteRequests.collect { id -> navController.navigate(NexusDestination.NoteEditor.createRoute(id)) }
+    LaunchedEffect(navController, openRoutes) {
+        openRoutes.collect { route -> navController.navigate(route) { launchSingleTop = true } }
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination

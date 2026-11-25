@@ -40,6 +40,13 @@ data class AppSettings(
     val noteSort: NoteSort = NoteSort.MODIFIED,
     val saveSearchHistory: Boolean = false,
     val searchHistory: List<String> = emptyList(),
+    /** Optional AI tools (prompt builder + share). Off by default. */
+    val aiToolsEnabled: Boolean = false,
+    val autoBackupEnabled: Boolean = false,
+    /** content:// tree chosen with the system folder picker (persisted permission). */
+    val autoBackupFolder: String? = null,
+    val autoBackupIntervalDays: Int = 1,
+    val autoBackupKeep: Int = 5,
 )
 
 /** Result of an autosave attempt. */

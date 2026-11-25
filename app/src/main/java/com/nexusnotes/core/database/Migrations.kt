@@ -168,5 +168,21 @@ object Migrations {
         }
     }
 
-    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+    /** v7: reminders and user note templates (add-only). */
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `reminders` (`noteId` TEXT NOT NULL, `triggerAt` INTEGER NOT NULL, " +
+                    "`repeat` TEXT NOT NULL, `anchorAt` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`noteId`), " +
+                    "FOREIGN KEY(`noteId`) REFERENCES `notes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_triggerAt` ON `reminders` (`triggerAt`)")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `note_templates` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, " +
+                    "`title` TEXT NOT NULL, `body` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+            )
+        }
+    }
+
+    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
 }

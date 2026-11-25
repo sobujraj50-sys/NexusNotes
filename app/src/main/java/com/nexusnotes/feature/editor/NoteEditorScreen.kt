@@ -69,6 +69,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
@@ -133,6 +134,11 @@ fun NoteEditorScreen(
     val vaultUnlocked by viewModel.vaultUnlocked.collectAsStateWithLifecycle()
     var vaultDialog by rememberSaveable { mutableStateOf<String?>(null) }
     var showExport by rememberSaveable { mutableStateOf(false) }
+    var showReminder by rememberSaveable { mutableStateOf(false) }
+    var showAi by rememberSaveable { mutableStateOf(false) }
+    var showSaveTemplate by rememberSaveable { mutableStateOf(false) }
+    val reminder by viewModel.reminder.collectAsStateWithLifecycle()
+    val aiEnabled by viewModel.aiToolsEnabled.collectAsStateWithLifecycle()
     val exportMd = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/markdown")) { uri ->
         uri?.let { viewModel.exportNote(com.nexusnotes.domain.backup.ExportFormat.MARKDOWN, it) }
     }
@@ -319,6 +325,23 @@ fun NoteEditorScreen(
                                 onClick = { menuOpen = false; viewModel.toggleArchived() },
                             )
                             DropdownMenuItem(
+                                text = { Text(if (reminder == null) "Reminder…" else "Edit reminder") },
+                                leadingIcon = { Icon(Icons.Filled.Notifications, null) },
+                                onClick = { menuOpen = false; showReminder = true },
+                            )
+                            if (aiEnabled) {
+                                DropdownMenuItem(
+                                    text = { Text("AI tools…") },
+                                    leadingIcon = { Icon(NexusIcons.Sparkle, null) },
+                                    onClick = { menuOpen = false; viewModel.flush(); showAi = true },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Save as template") },
+                                leadingIcon = { Icon(NexusIcons.Copy, null) },
+                                onClick = { menuOpen = false; showSaveTemplate = true },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Export…") },
                                 leadingIcon = { Icon(Icons.Filled.Share, null) },
                                 onClick = { menuOpen = false; showExport = true },
@@ -396,6 +419,10 @@ fun NoteEditorScreen(
             onAddTagClick = { showAddTag = true },
             onRemoveTag = viewModel::removeTag,
             onAttach = onAttachAction,
+            reminderLabel = reminder?.let {
+                com.nexusnotes.domain.reminder.ReminderSchedule.label(it.triggerAt, it.repeat, System.currentTimeMillis(), java.time.ZoneId.systemDefault())
+            },
+            onReminderClick = { showReminder = true },
             fileFor = viewModel::fileFor,
             onRemoveAttachment = { viewModel.removeAttachment(it.id) },
         )
@@ -413,6 +440,44 @@ fun NoteEditorScreen(
     }
     if (showInfoDialog && note != null) {
         NoteInfoDialog(state = state, onDismiss = { showInfoDialog = false })
+    }
+    if (showReminder) {
+        com.nexusnotes.feature.reminders.ReminderDialog(
+            current = reminder,
+            exactAllowed = viewModel.exactAlarmsAllowed,
+            onSave = { at, repeat ->
+                showReminder = false
+                viewModel.setReminder(at, repeat)
+            },
+            onRemove = {
+                showReminder = false
+                viewModel.removeReminder()
+            },
+            onDismiss = { showReminder = false },
+        )
+    }
+    if (showAi) {
+        com.nexusnotes.feature.ai.AiToolsDialog(title = state.title.text, body = state.body.text, onDismiss = { showAi = false })
+    }
+    if (showSaveTemplate) {
+        var name by remember { mutableStateOf(state.title.text.take(40)) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showSaveTemplate = false },
+            title = { Text("Save as template") },
+            text = {
+                androidx.compose.foundation.layout.Column {
+                    Text("New notes can start from this note's title and text (placeholders like {{date}} are filled in).", style = MaterialTheme.typography.bodySmall)
+                    androidx.compose.material3.OutlinedTextField(name, { name = it.take(80) }, singleLine = true, label = { Text("Template name") })
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showSaveTemplate = false
+                    viewModel.saveAsTemplate(name)
+                }) { Text("Save") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { showSaveTemplate = false }) { Text("Cancel") } },
+        )
     }
     if (showExport) {
         val base = com.nexusnotes.domain.backup.NoteExport.fileName(state.title.text, "x", mutableSetOf()).removeSuffix(".x")
@@ -533,6 +598,8 @@ private fun EditorContent(
     onAddTagClick: () -> Unit,
     onRemoveTag: (String) -> Unit,
     onAttach: (AttachAction) -> Unit,
+    reminderLabel: String?,
+    onReminderClick: () -> Unit,
     fileFor: (com.nexusnotes.domain.model.Attachment) -> java.io.File,
     onRemoveAttachment: (com.nexusnotes.domain.model.Attachment) -> Unit,
 ) {
@@ -626,6 +693,8 @@ private fun EditorContent(
                 onAddTagClick = onAddTagClick,
                 onRemoveTag = onRemoveTag,
                 onAttach = onAttach,
+                reminderLabel = reminderLabel,
+                onReminderClick = onReminderClick,
             )
             AttachmentStrip(
                 attachments = state.attachments,
@@ -908,6 +977,8 @@ private fun OrganizeChips(
     onAddTagClick: () -> Unit,
     onRemoveTag: (String) -> Unit,
     onAttach: (AttachAction) -> Unit,
+    reminderLabel: String?,
+    onReminderClick: () -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
     val enabled = !state.isReadOnly
@@ -920,6 +991,14 @@ private fun OrganizeChips(
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (reminderLabel != null) {
+            AssistChip(
+                onClick = onReminderClick,
+                enabled = enabled,
+                label = { Text(reminderLabel) },
+                leadingIcon = { Icon(Icons.Filled.Notifications, contentDescription = "Reminder", modifier = Modifier.size(AssistChipDefaults.IconSize)) },
+            )
+        }
         if (enabled) {
             Box {
                 AssistChip(

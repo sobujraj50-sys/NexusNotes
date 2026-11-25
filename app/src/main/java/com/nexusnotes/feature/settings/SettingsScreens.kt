@@ -142,8 +142,30 @@ fun SettingsScreen(
             }
 
             item { SectionHeader("Productivity & AI", Modifier.padding(top = spacing.md)) }
-            item { NexusListRow(Icons.Filled.Notifications, "Reminders", supporting = "Asks for notification permission only when used", milestone = 9) }
-            item { NexusListRow(NexusIcons.Sparkle, "AI features", supporting = "Off. Optional, never required, nothing is sent without your consent", milestone = 9) }
+            item {
+                NexusListRow(
+                    Icons.Filled.Notifications, "Reminders",
+                    supporting = "All note reminders. Notification permission is asked only when you set one.",
+                    onClick = { onNavigate(NexusDestination.Reminders.route) },
+                )
+            }
+            item {
+                NexusListRow(
+                    NexusIcons.Note, "Templates",
+                    supporting = "Start notes from checklists, journals, meeting notes or your own",
+                    onClick = { onNavigate(NexusDestination.Templates.route) },
+                )
+            }
+            item {
+                SwitchRow(
+                    title = "AI tools (optional)",
+                    supporting = "Adds “AI tools…” to the note menu: builds a prompt you can send to an AI app you choose. " +
+                        "Nexus Notes itself never connects to the internet. Off by default.",
+                    checked = settings.aiToolsEnabled,
+                    enabled = true,
+                    onCheckedChange = viewModel::setAiToolsEnabled,
+                )
+            }
 
             item { SectionHeader("App", Modifier.padding(top = spacing.md)) }
             item {
@@ -224,7 +246,7 @@ fun AboutScreen(onBack: () -> Unit) {
     val promises = listOf(
         "No ads and no tracking SDKs",
         "No account and no subscription",
-        "Works fully offline — microphone is asked only when you record; fingerprint only for the vault",
+        "Works fully offline — no internet permission. Microphone, notifications and alarms are asked only when you use them",
         "Notes are stored only in this app's private storage on this phone",
         "Nothing is uploaded without your explicit consent",
         "Android cloud backup is disabled for this app",
@@ -273,10 +295,10 @@ fun AboutScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(spacing.lg))
             SectionHeader("Build status")
             Text(
-                "Milestone 8 of 10: notes with autosave, Markdown editor, folders, tags, offline " +
-                    "search, the AI Prompt Library, attachments, the encrypted Private Vault, and " +
-                    "verified backup/restore with TXT, Markdown, JSON and PDF export. Features marked " +
-                    "with a milestone badge are not built yet.",
+                "Milestone 9 of 10: notes, Markdown editor, folders, tags, offline search, the AI " +
+                    "Prompt Library, attachments, the encrypted Private Vault, verified backup/restore " +
+                    "and export, reminders, templates, a home-screen widget, quick-note shortcuts and " +
+                    "optional AI tools.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

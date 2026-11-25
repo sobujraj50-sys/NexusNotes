@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.nexusnotes.data.dao.AttachmentDao
 import com.nexusnotes.data.dao.BackupDao
+import com.nexusnotes.data.dao.ReminderDao
+import com.nexusnotes.data.dao.TemplateDao
 import com.nexusnotes.data.dao.FolderDao
 import com.nexusnotes.data.dao.NoteDao
 import com.nexusnotes.data.dao.PromptDao
@@ -13,6 +15,8 @@ import com.nexusnotes.data.dao.TagDao
 import com.nexusnotes.data.dao.VaultDao
 import com.nexusnotes.data.entity.AttachmentEntity
 import com.nexusnotes.data.entity.BackupHistoryEntity
+import com.nexusnotes.data.entity.NoteTemplateEntity
+import com.nexusnotes.data.entity.ReminderEntity
 import com.nexusnotes.data.entity.FolderEntity
 import com.nexusnotes.data.entity.NoteEntity
 import com.nexusnotes.data.entity.NoteFtsEntity
@@ -55,8 +59,10 @@ private object SecureDeleteCallback : RoomDatabase.Callback() {
         VaultItemEntity::class,
         VaultAttachmentEntity::class,
         BackupHistoryEntity::class,
+        ReminderEntity::class,
+        NoteTemplateEntity::class,
     ],
-    version = 6, // keep equal to VERSION below
+    version = 7, // keep equal to VERSION below
     exportSchema = true,
 )
 abstract class NexusDatabase : RoomDatabase() {
@@ -67,10 +73,12 @@ abstract class NexusDatabase : RoomDatabase() {
     abstract fun attachmentDao(): AttachmentDao
     abstract fun vaultDao(): VaultDao
     abstract fun backupDao(): BackupDao
+    abstract fun reminderDao(): ReminderDao
+    abstract fun templateDao(): TemplateDao
 
     companion object {
         const val NAME = "nexus.db"
-        const val VERSION = 6
+        const val VERSION = 7
 
         fun build(context: Context): NexusDatabase {
             DatabaseSafety.backupBeforeUpgrade(context.applicationContext, VERSION)

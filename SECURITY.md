@@ -50,3 +50,9 @@ See docs/MILESTONE_7.md for the full design and threat model. Summary: AES-256-G
 - Normal notes in a backup are NOT encrypted (the user is told); vault content stays AES-GCM encrypted, with the vault key wrapped by a separate backup password (PBKDF2 600k).
 - Restores verify SHA-256 of every entry, reject unknown/path-traversal entries and oversized archives, and write in one DB transaction.
 - Exports never contain vault notes or Trash.
+
+## M9 additions
+- Reminder notifications show the note title only, with a public lock-screen version that hides it.
+- The widget shows titles only; vault notes never appear.
+- AI tools: no INTERNET permission, no API keys; the user sees the exact prompt and explicitly sends it to an app of their choice.
+- Automatic backups exclude the vault and only write to the folder the user granted.

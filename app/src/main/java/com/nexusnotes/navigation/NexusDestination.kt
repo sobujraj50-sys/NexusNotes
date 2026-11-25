@@ -62,6 +62,8 @@ sealed class NexusDestination(val route: String, val title: String) {
         fun createRoute(itemId: String? = null): String = withQuery("vault/editor", ARG_VAULT_ITEM_ID to itemId)
     }
     data object Backup : NexusDestination("backup", "Backup & Restore")
+    data object Templates : NexusDestination("templates", "Templates")
+    data object Reminders : NexusDestination("reminders", "Reminders")
     data object Settings : NexusDestination("settings", "Settings")
     data object About : NexusDestination("about", "About")
 }
@@ -99,6 +101,8 @@ object NexusDestinations {
             NexusDestination.Vault,
             NexusDestination.VaultEditor,
             NexusDestination.Backup,
+            NexusDestination.Templates,
+            NexusDestination.Reminders,
             NexusDestination.Settings,
             NexusDestination.About,
         )

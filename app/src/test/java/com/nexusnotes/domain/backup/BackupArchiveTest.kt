@@ -31,6 +31,8 @@ class BackupArchiveTest {
         variables = listOf(VariableRec("p1", "text", "")),
         versions = listOf(VersionRec("v1", "p1", "Summarise", "Summarise {{text}}", 1)),
         attachments = listOf(AttachmentRec("a1", "n1", "IMAGE", "a1.jpg", "photo.jpg", "image/jpeg", 4, "x", null, 5)),
+        templates = listOf(TemplateRec("tp1", "Daily", "{{date}}", "- [ ] ", 1)),
+        reminders = listOf(ReminderRec("n1", 100, "DAILY", 100, 1)),
     )
     private val photo = byteArrayOf(1, 2, 3, 4)
 
@@ -52,6 +54,15 @@ class BackupArchiveTest {
         assertEquals(2L, staged.manifest.counts["notes"])
         assertArrayEquals(photo, staged.file("attachments/a1.jpg")!!.readBytes())
         assertNull(staged.file("attachments/none.jpg"))
+    }
+
+    @Test fun olderBackupWithoutNewSectionsStillReads() {
+        // A backup written before templates/reminders existed has no such keys.
+        val json = BackupJson.encodeData(data).replace(Regex(""","templates":\[.*?\],"reminders":\[.*?\]"""), "")
+        val d = BackupJson.decodeData(json)
+        assertEquals(emptyList<TemplateRec>(), d.templates)
+        assertEquals(emptyList<ReminderRec>(), d.reminders)
+        assertEquals(data.notes, d.notes)
     }
 
     @Test fun emptyBackupIsValid() {
