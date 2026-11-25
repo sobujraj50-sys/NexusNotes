@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -109,7 +111,7 @@ fun VaultUnlockDialog(
     }
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        icon = { Icon(androidx.compose.material.icons.Icons.Filled.Lock, contentDescription = null) },
+        icon = { Icon(Icons.Filled.Lock, contentDescription = null) },
         title = { Text(title) },
         text = {
             Column {

@@ -342,7 +342,7 @@ class NoteEditorViewModel(
             saveJob?.cancel()
             val result = withContext(NonCancellable) {
                 saveNow()
-                if (!_uiState.value.isStored) return@withContext Result.failure(IllegalStateException("Write something first."))
+                if (!_uiState.value.isStored) return@withContext Result.failure<String>(IllegalStateException("Write something first."))
                 movedToVault = true
                 hasUnsavedChanges = false
                 vault.moveNoteToVault(noteId)
