@@ -1,5 +1,6 @@
 package com.nexusnotes.core.backup
 
+import com.nexusnotes.openDatabase
 import android.app.job.JobInfo
 import android.app.job.JobParameters
 import android.app.job.JobScheduler

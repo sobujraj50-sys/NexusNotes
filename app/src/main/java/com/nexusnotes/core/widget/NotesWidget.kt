@@ -1,5 +1,6 @@
 package com.nexusnotes.core.widget
 
+import com.nexusnotes.openDatabase
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
