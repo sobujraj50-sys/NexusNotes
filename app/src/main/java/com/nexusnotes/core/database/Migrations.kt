@@ -8,6 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *  v1 (Milestone 2): notes
  *  v2 (Milestone 4): + notes.folderId, folders, tags, note_tags, notes_fts (full-text index)
  *  v3 (Milestone 5): + prompts, prompt_categories, prompt_variables, prompt_versions, prompts_fts
+ *  v4 (Milestone 6): + attachments
  *
  * Migrations only ADD tables, columns and indexes. Existing rows are never rewritten or
  * dropped, so every note survives the upgrade. Room checks the resulting schema on open.
@@ -85,6 +86,19 @@ object Migrations {
         }
     }
 
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `attachments` (`id` TEXT NOT NULL, `noteId` TEXT NOT NULL, " +
+                    "`kind` TEXT NOT NULL, `fileName` TEXT NOT NULL, `displayName` TEXT NOT NULL, " +
+                    "`mimeType` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `sha256` TEXT NOT NULL, " +
+                    "`durationMs` INTEGER, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`), " +
+                    "FOREIGN KEY(`noteId`) REFERENCES `notes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_attachments_noteId` ON `attachments` (`noteId`)")
+        }
+    }
+
     fun createPromptsFtsTriggers(db: SupportSQLiteDatabase) {
         db.execSQL(
             "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_prompts_fts_BEFORE_UPDATE BEFORE UPDATE ON `prompts` " +
@@ -127,5 +141,5 @@ object Migrations {
         )
     }
 
-    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 }

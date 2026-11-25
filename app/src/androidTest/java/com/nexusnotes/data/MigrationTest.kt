@@ -88,6 +88,13 @@ class MigrationTest {
             assertEquals(listOf("p1"), prompts.search("\"golden*\"", 10).first().map { it.id })
             assertEquals(1, prompts.observeVersions("p1").first().size)
 
+            // Attachments table exists (v4) and rows go away when the note is deleted forever.
+            db.attachmentDao().insert(
+                com.nexusnotes.data.entity.AttachmentEntity("att1", "c", "FILE", "att1.pdf", "doc.pdf", "application/pdf", 10, "00", null, 1),
+            )
+            dao.deletePermanently("c")
+            assertEquals(null, db.attachmentDao().getById("att1"))
+
             // The index follows later edits (sync triggers exist).
             dao.updateContent("a", "Shopping list", "eggs", 50)
             assertEquals(0, dao.search("\"milk*\"", null, false, null, false, 50).first().size)

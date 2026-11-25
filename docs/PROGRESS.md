@@ -23,3 +23,7 @@
 - M5: own template engine (single-pass, never mutates source) and strict JSON codec; prompt history coalesced per 5 min, 30 kept.
 - 2026-11-24: Fixed crash opening Prompt Library — `{{variable}}` regex had an unescaped `}}`; Android's ICU regex rejects it (JVM accepts). All braces now escaped. Lesson: JVM tests cannot catch ICU-only regex errors; keep braces/brackets escaped in every pattern.
 - 2026-11-24: Signing fixed — KEYSTORE_BASE64 secret had never been added (every build used a throwaway debug key, forcing uninstalls). Local crash reporter added (0.5.1).
+
+
+## Milestone 6 — Attachments (0.6.0-m6) — delivered, awaiting test
+Photo/audio/file attachments, image viewer, audio recorder/player, Share to Nexus Notes, missing-file recovery, storage cleanup, DB v4. Unit tests: 125 pass locally; v1→v4 migration verified on SQLite.

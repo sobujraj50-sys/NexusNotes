@@ -103,3 +103,16 @@ data class PromptCategoryRef(val key: String, val name: String, val isCustom: Bo
         fun customKey(id: String) = CUSTOM_PREFIX + id
     }
 }
+
+/** A file attached to a note. The bytes live in app-private storage under [fileName]. */
+data class Attachment(
+    val id: String,
+    val noteId: String,
+    val kind: com.nexusnotes.domain.attachment.AttachmentKind,
+    val fileName: String,
+    val displayName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val durationMs: Long?,
+    val createdAt: Long,
+)

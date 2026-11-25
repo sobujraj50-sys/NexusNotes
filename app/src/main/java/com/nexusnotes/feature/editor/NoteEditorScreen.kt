@@ -1,6 +1,12 @@
 package com.nexusnotes.feature.editor
 
 import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -118,6 +124,7 @@ fun NoteEditorScreen(
     viewModel: NoteEditorViewModel = viewModel(factory = NoteEditorViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
 
     // Save immediately when the app goes to the background or the screen is left.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.flush() }
@@ -127,6 +134,7 @@ fun NoteEditorScreen(
             when (event) {
                 EditorEvent.Close -> onBack()
                 is EditorEvent.OpenNote -> onOpenNote(event.id)
+                is EditorEvent.Message -> snackbar.showSnackbar(event.text)
             }
         }
     }
@@ -140,6 +148,34 @@ fun NoteEditorScreen(
     var showColorDialog by rememberSaveable { mutableStateOf(false) }
     var showFolderPicker by rememberSaveable { mutableStateOf(false) }
     var showAddTag by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    var recording by remember { mutableStateOf<Pair<String, java.io.File>?>(null) }
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) viewModel.attach(uri)
+    }
+    val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.attach(uri)
+    }
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            recording = viewModel.newRecording()
+        } else {
+            android.widget.Toast.makeText(context, "Microphone permission is needed to record audio.", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    val onAttachAction: (AttachAction) -> Unit = { action ->
+        when (action) {
+            AttachAction.PHOTO -> pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            AttachAction.FILE -> pickFile.launch(arrayOf("*/*"))
+            AttachAction.AUDIO -> {
+                val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.RECORD_AUDIO,
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (granted) recording = viewModel.newRecording() else micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
     var showInfoDialog by rememberSaveable { mutableStateOf(false) }
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
     val note = state.note
@@ -165,6 +201,7 @@ fun NoteEditorScreen(
 
     NexusScreen(
         title = "",
+        snackbarHost = { SnackbarHost(snackbar) },
         onBack = {
             viewModel.flush()
             onBack()
@@ -318,6 +355,9 @@ fun NoteEditorScreen(
             onFolderClick = { showFolderPicker = true },
             onAddTagClick = { showAddTag = true },
             onRemoveTag = viewModel::removeTag,
+            onAttach = onAttachAction,
+            fileFor = viewModel::fileFor,
+            onRemoveAttachment = { viewModel.removeAttachment(it.id) },
         )
     }
 
@@ -333,6 +373,16 @@ fun NoteEditorScreen(
     }
     if (showInfoDialog && note != null) {
         NoteInfoDialog(state = state, onDismiss = { showInfoDialog = false })
+    }
+    recording?.let { (id, file) ->
+        RecordAudioDialog(
+            output = file,
+            onSaved = { duration ->
+                viewModel.saveRecording(id, file, duration)
+                recording = null
+            },
+            onCancel = { recording = null },
+        )
     }
     if (showFolderPicker) {
         FolderPickerDialog(
@@ -388,6 +438,9 @@ private fun EditorContent(
     onFolderClick: () -> Unit,
     onAddTagClick: () -> Unit,
     onRemoveTag: (String) -> Unit,
+    onAttach: (AttachAction) -> Unit,
+    fileFor: (com.nexusnotes.domain.model.Attachment) -> java.io.File,
+    onRemoveAttachment: (com.nexusnotes.domain.model.Attachment) -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
     val bodyText = state.body.text
@@ -478,6 +531,15 @@ private fun EditorContent(
                 onFolderClick = onFolderClick,
                 onAddTagClick = onAddTagClick,
                 onRemoveTag = onRemoveTag,
+                onAttach = onAttach,
+            )
+            AttachmentStrip(
+                attachments = state.attachments,
+                missing = state.missingAttachments,
+                isAttaching = state.isAttaching,
+                readOnly = state.isReadOnly,
+                fileFor = fileFor,
+                onRemove = onRemoveAttachment,
             )
         }
         HorizontalDivider(Modifier.padding(top = spacing.sm), color = MaterialTheme.colorScheme.outlineVariant)
@@ -751,9 +813,11 @@ private fun OrganizeChips(
     onFolderClick: () -> Unit,
     onAddTagClick: () -> Unit,
     onRemoveTag: (String) -> Unit,
+    onAttach: (AttachAction) -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
     val enabled = !state.isReadOnly
+    var attachMenu by remember { mutableStateOf(false) }
     Row(
         Modifier
             .fillMaxWidth()
@@ -762,6 +826,33 @@ private fun OrganizeChips(
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (enabled) {
+            Box {
+                AssistChip(
+                    onClick = { attachMenu = true },
+                    label = { Text("Attach") },
+                    leadingIcon = { Icon(NexusIcons.Attach, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
+                    modifier = Modifier.testTag(EDITOR_ATTACH_TAG),
+                )
+                DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Photo") },
+                        leadingIcon = { Icon(NexusIcons.Image, null) },
+                        onClick = { attachMenu = false; onAttach(AttachAction.PHOTO) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Record audio") },
+                        leadingIcon = { Icon(NexusIcons.Mic, null) },
+                        onClick = { attachMenu = false; onAttach(AttachAction.AUDIO) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("File") },
+                        leadingIcon = { Icon(NexusIcons.Attach, null) },
+                        onClick = { attachMenu = false; onAttach(AttachAction.FILE) },
+                    )
+                }
+            }
+        }
         AssistChip(
             onClick = onFolderClick,
             enabled = enabled,
@@ -862,3 +953,7 @@ private fun AddTagDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+enum class AttachAction { PHOTO, AUDIO, FILE }
+
+const val EDITOR_ATTACH_TAG = "editor_attach"

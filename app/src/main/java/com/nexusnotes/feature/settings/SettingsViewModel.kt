@@ -13,7 +13,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class SettingsViewModel(private val settings: SettingsRepository) : ViewModel() {
+class SettingsViewModel(
+    private val settings: SettingsRepository,
+    attachments: com.nexusnotes.data.repository.AttachmentRepository,
+) : ViewModel() {
+
+    val attachmentBytes: StateFlow<Long> =
+        attachments.observeTotalBytes().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+
 
     val uiState: StateFlow<AppSettings> =
         settings.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
@@ -32,7 +39,10 @@ class SettingsViewModel(private val settings: SettingsRepository) : ViewModel() 
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { SettingsViewModel(appContainer().settingsRepository) }
+            initializer {
+                val c = appContainer()
+                SettingsViewModel(c.settingsRepository, c.attachmentRepository)
+            }
         }
     }
 }

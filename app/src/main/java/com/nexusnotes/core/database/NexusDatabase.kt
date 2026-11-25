@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.nexusnotes.data.dao.AttachmentDao
 import com.nexusnotes.data.dao.FolderDao
 import com.nexusnotes.data.dao.NoteDao
 import com.nexusnotes.data.dao.PromptDao
 import com.nexusnotes.data.dao.TagDao
+import com.nexusnotes.data.entity.AttachmentEntity
 import com.nexusnotes.data.entity.FolderEntity
 import com.nexusnotes.data.entity.NoteEntity
 import com.nexusnotes.data.entity.NoteFtsEntity
@@ -37,8 +39,9 @@ import com.nexusnotes.data.entity.TagEntity
         PromptVariableEntity::class,
         PromptVersionEntity::class,
         PromptFtsEntity::class,
+        AttachmentEntity::class,
     ],
-    version = 3, // keep equal to VERSION below
+    version = 4, // keep equal to VERSION below
     exportSchema = true,
 )
 abstract class NexusDatabase : RoomDatabase() {
@@ -46,10 +49,11 @@ abstract class NexusDatabase : RoomDatabase() {
     abstract fun folderDao(): FolderDao
     abstract fun tagDao(): TagDao
     abstract fun promptDao(): PromptDao
+    abstract fun attachmentDao(): AttachmentDao
 
     companion object {
         const val NAME = "nexus.db"
-        const val VERSION = 3
+        const val VERSION = 4
 
         fun build(context: Context): NexusDatabase {
             DatabaseSafety.backupBeforeUpgrade(context.applicationContext, VERSION)

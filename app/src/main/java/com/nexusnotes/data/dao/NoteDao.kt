@@ -86,17 +86,34 @@ abstract class NoteDao {
     @Query("DELETE FROM note_tags WHERE noteId IN (SELECT id FROM notes WHERE deletedAt IS NOT NULL)")
     abstract suspend fun deleteTagLinksOfAllTrashed(): Int
 
-    /** Only notes already in Trash can be deleted permanently. Their tag links go too. */
+    @Query("DELETE FROM attachments WHERE noteId = :id AND EXISTS (SELECT 1 FROM notes WHERE id = :id AND deletedAt IS NOT NULL)")
+    abstract suspend fun deleteAttachmentRowsOfTrashed(id: String): Int
+
+    @Query("DELETE FROM attachments WHERE noteId IN (SELECT id FROM notes WHERE deletedAt IS NOT NULL)")
+    abstract suspend fun deleteAttachmentRowsOfAllTrashed(): Int
+
+    /**
+     * Only notes already in Trash can be deleted permanently. Their tag links and attachment
+     * rows go too (attachment files are removed afterwards by AttachmentRepository.cleanUpFiles).
+     */
     @Transaction
     open suspend fun deletePermanently(id: String): Int {
         deleteTagLinksOfTrashed(id)
+        deleteAttachmentRowsOfTrashed(id)
         return deleteTrashedRow(id)
     }
 
     @Transaction
     open suspend fun emptyTrash(): Int {
         deleteTagLinksOfAllTrashed()
+        deleteAttachmentRowsOfAllTrashed()
         return deleteAllTrashedRows()
+    }
+
+    /** Creates an empty note row if it does not exist yet (a note may hold only attachments). */
+    @Transaction
+    open suspend fun ensureExists(id: String, now: Long, folderIdForNew: String?) {
+        if (getById(id) == null) insert(NoteEntity.new(id, "", "", now, folderIdForNew))
     }
 
     // ---------------- Folders ----------------

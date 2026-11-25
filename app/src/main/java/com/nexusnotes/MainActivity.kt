@@ -1,7 +1,9 @@
 package com.nexusnotes
 
 import android.graphics.Color
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -15,6 +17,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nexusnotes.core.common.SharedContent
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.nexusnotes.core.design.theme.NexusTheme
 import com.nexusnotes.domain.model.AppSettings
 import com.nexusnotes.domain.model.ThemeMode
@@ -24,11 +32,18 @@ import com.nexusnotes.core.database.DatabaseState
 import com.nexusnotes.navigation.NexusNotesRoot
 
 class MainActivity : ComponentActivity() {
+
+    /** Notes to open (e.g. one just created from shared content). */
+    private val openNoteRequests = Channel<String>(Channel.BUFFERED)
+    private val openNoteFlow = openNoteRequests.receiveAsFlow()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val container = (application as NexusNotesApp).container
         val settingsFlow = container.settingsRepository.settings
+        // A share is handled once; after rotation/recreation the saved state is non-null.
+        if (savedInstanceState == null) handleShare(intent)
 
         setContent {
             val settings by settingsFlow.collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -57,11 +72,39 @@ class MainActivity : ComponentActivity() {
                 }
                 when (val state = dbState) {
                     DatabaseState.Opening -> Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
-                    DatabaseState.Ready -> NexusNotesRoot()
+                    DatabaseState.Ready -> NexusNotesRoot(openNoteRequests = openNoteFlow)
                     is DatabaseState.Failed -> DatabaseErrorScreen(state.error)
                 }
                 CrashReportDialog()
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShare(intent)
+    }
+
+    /** Turns text/files shared from another app into a new note, then opens it. */
+    private fun handleShare(intent: Intent?) {
+        val share = SharedContent.from(intent) ?: return
+        val container = (application as NexusNotesApp).container
+        val appContext = applicationContext
+        // Application scope: the copy finishes even if this screen is closed meanwhile.
+        container.applicationScope.launch {
+            if (container.openDatabase().isFailure) return@launch
+            val result = container.attachmentRepository.importShare(container.noteRepository, share.subject, share.text, share.uris)
+            withContext(Dispatchers.Main) {
+                if (result.failed > 0) {
+                    Toast.makeText(
+                        appContext,
+                        "${result.failed} item(s) could not be attached (too large or unreadable).",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+            openNoteRequests.send(result.noteId)
         }
     }
 

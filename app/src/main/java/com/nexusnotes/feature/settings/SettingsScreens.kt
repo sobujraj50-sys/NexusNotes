@@ -62,6 +62,7 @@ fun SettingsScreen(
 ) {
     val spacing = MaterialTheme.spacing
     val settings by viewModel.uiState.collectAsStateWithLifecycle()
+    val attachmentBytes by viewModel.attachmentBytes.collectAsStateWithLifecycle()
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
     val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     NexusScreen(title = NexusDestination.Settings.title) { padding ->
@@ -92,6 +93,17 @@ fun SettingsScreen(
                     "Backup & restore",
                     supporting = "Local backups and exports",
                     onClick = { onNavigate(NexusDestination.Backup.route) },
+                )
+            }
+
+            item {
+                NexusListRow(
+                    NexusIcons.Attach,
+                    "Attachment storage",
+                    supporting = com.nexusnotes.domain.attachment.AttachmentPolicy.formatSize(attachmentBytes) +
+                        " used · private to this app · max " +
+                        com.nexusnotes.domain.attachment.AttachmentPolicy.formatSize(com.nexusnotes.domain.attachment.AttachmentPolicy.MAX_FILE_BYTES) +
+                        " per file",
                 )
             }
 
@@ -212,7 +224,7 @@ fun AboutScreen(onBack: () -> Unit) {
     val promises = listOf(
         "No ads and no tracking SDKs",
         "No account and no subscription",
-        "Works fully offline — this version requests no permissions at all",
+        "Works fully offline — the only permission is the microphone, asked only when you record",
         "Notes are stored only in this app's private storage on this phone",
         "Nothing is uploaded without your explicit consent",
         "Android cloud backup is disabled for this app",
@@ -261,9 +273,9 @@ fun AboutScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(spacing.lg))
             SectionHeader("Build status")
             Text(
-                "Milestone 5 of 10: notes with autosave, Markdown editor, nested folders, tags, " +
-                    "offline full-text search and the AI Prompt Library with templates, history and " +
-                    "import/export. Features marked with a milestone badge are not built yet.",
+                "Milestone 6 of 10: notes with autosave, Markdown editor, folders, tags, offline " +
+                    "search, the AI Prompt Library, and image/audio/file attachments with Share to " +
+                    "Nexus Notes. Features marked with a milestone badge are not built yet.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

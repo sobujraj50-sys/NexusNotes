@@ -33,3 +33,11 @@ No ads, no trackers, no mandatory account or internet, no plaintext vault secret
 
 ## Reporting
 Personal project: record issues in docs/PROGRESS.md.
+
+
+## Attachments (M6)
+- Stored only in app-private storage; no broad storage permission requested.
+- Photo Picker / Storage Access Framework give one-time access to the chosen item only.
+- Microphone permission is requested only when recording starts.
+- Files are shared out only on explicit user action, through FileProvider with a temporary read grant.
+- Shared-in content is treated as untrusted: only content:// URIs, size limits, sanitized names.

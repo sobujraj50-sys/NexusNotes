@@ -15,6 +15,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -25,14 +26,19 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.nexusnotes.core.design.icons.NexusIcons
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 fun bottomNavTag(destination: TopLevelDestination): String = "bottom_nav_${destination.name.lowercase()}"
 
 /** Root composable: bottom navigation (top-level screens only) + navigation host. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NexusNotesRoot() {
+fun NexusNotesRoot(openNoteRequests: Flow<String> = emptyFlow()) {
     val navController = rememberNavController()
+    LaunchedEffect(navController, openNoteRequests) {
+        openNoteRequests.collect { id -> navController.navigate(NexusDestination.NoteEditor.createRoute(id)) }
+    }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val showBottomBar = currentDestination?.route?.let { it in NexusDestinations.topLevelRoutes } == true

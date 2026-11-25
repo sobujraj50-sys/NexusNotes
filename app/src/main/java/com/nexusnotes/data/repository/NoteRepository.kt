@@ -48,6 +48,8 @@ interface NoteRepository {
 class OfflineNoteRepository(
     private val dao: NoteDao,
     private val clock: Clock,
+    /** Lets note deletion remove attachment files and duplication copy them. */
+    private val attachments: () -> AttachmentRepository,
 ) : NoteRepository {
 
     private fun Flow<List<NoteEntity>>.toNotes(): Flow<List<Note>> = map { list -> list.map { it.toDomain() } }
@@ -107,14 +109,18 @@ class OfflineNoteRepository(
 
     override suspend fun deletePermanently(id: String) {
         dao.deletePermanently(id)
+        attachments().cleanUpFiles()
     }
 
     override suspend fun emptyTrash() {
         dao.emptyTrash()
+        attachments().cleanUpFiles()
     }
 
     override suspend fun duplicate(id: String): String? {
         val newId = UUID.randomUUID().toString()
-        return if (dao.duplicate(id, newId, clock.now())) newId else null
+        if (!dao.duplicate(id, newId, clock.now())) return null
+        attachments().duplicateAll(id, newId)
+        return newId
     }
 }

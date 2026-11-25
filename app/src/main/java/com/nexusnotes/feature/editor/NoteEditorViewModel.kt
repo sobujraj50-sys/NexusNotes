@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.nexusnotes.appContainer
 import com.nexusnotes.core.common.Clock
+import com.nexusnotes.data.repository.AttachmentRepository
 import com.nexusnotes.data.repository.NoteRepository
 import com.nexusnotes.data.repository.OrganizationRepository
 import com.nexusnotes.domain.EditHistory
@@ -17,6 +18,7 @@ import com.nexusnotes.domain.EditorSnapshot
 import com.nexusnotes.domain.markdown.FormatAction
 import com.nexusnotes.domain.markdown.MarkdownFormatter
 import com.nexusnotes.domain.markdown.TextEdit
+import com.nexusnotes.domain.model.Attachment
 import com.nexusnotes.domain.model.Folder
 import com.nexusnotes.domain.model.FolderNode
 import com.nexusnotes.domain.model.Note
@@ -63,6 +65,10 @@ data class EditorUiState(
     val folderTree: List<FolderNode> = emptyList(),
     val tags: List<Tag> = emptyList(),
     val allTags: List<Tag> = emptyList(),
+    val attachments: List<Attachment> = emptyList(),
+    /** Attachments whose file is no longer on the phone. */
+    val missingAttachments: Set<String> = emptySet(),
+    val isAttaching: Boolean = false,
 ) {
     val folderId: String? get() = if (note != null) note.folderId else pendingFolderId
     val folder: Folder? get() = folderId?.let { id -> folderTree.firstOrNull { it.folder.id == id }?.folder }
@@ -74,6 +80,7 @@ data class EditorUiState(
 sealed interface EditorEvent {
     data object Close : EditorEvent
     data class OpenNote(val id: String) : EditorEvent
+    data class Message(val text: String) : EditorEvent
 }
 
 /**
@@ -91,6 +98,7 @@ class NoteEditorViewModel(
     savedStateHandle: SavedStateHandle,
     private val repository: NoteRepository,
     private val organization: OrganizationRepository,
+    private val attachments: AttachmentRepository,
     private val appScope: CoroutineScope,
     private val clock: Clock,
 ) : ViewModel() {
@@ -123,6 +131,12 @@ class NoteEditorViewModel(
         }
         viewModelScope.launch {
             organization.observeTags().collect { tags -> _uiState.update { it.copy(allTags = tags) } }
+        }
+        viewModelScope.launch {
+            attachments.observeForNote(noteId).collect { list ->
+                val missing = attachments.missingIds(list)
+                _uiState.update { it.copy(attachments = list, missingAttachments = missing) }
+            }
         }
         viewModelScope.launch {
             val stored = repository.getNote(noteId)
@@ -246,6 +260,39 @@ class NoteEditorViewModel(
 
     fun removeTag(tagId: String) = withStoredNote { organization.removeTagFromNote(it.id, tagId) }
 
+    // ---- Attachments ----
+
+    /** Attaches a picked image or file. A new note is saved first so the attachment has a home. */
+    fun attach(uri: android.net.Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAttaching = true) }
+            saveJob?.cancel()
+            withContext(NonCancellable) { saveNow() }
+            val result = withContext(NonCancellable) { attachments.addFromUri(noteId, uri, _uiState.value.pendingFolderId) }
+            _uiState.update { it.copy(isAttaching = false) }
+            result.exceptionOrNull()?.let { _events.send(EditorEvent.Message(it.message ?: "Could not attach the file.")) }
+        }
+    }
+
+    fun newRecording(): Pair<String, java.io.File> = attachments.newRecording()
+
+    fun saveRecording(id: String, file: java.io.File, durationMs: Long) {
+        viewModelScope.launch {
+            saveJob?.cancel()
+            withContext(NonCancellable) { saveNow() }
+            val result = withContext(NonCancellable) {
+                attachments.addRecording(noteId, id, file, durationMs, _uiState.value.pendingFolderId)
+            }
+            result.exceptionOrNull()?.let { _events.send(EditorEvent.Message(it.message ?: "Could not save the recording.")) }
+        }
+    }
+
+    fun removeAttachment(id: String) {
+        appScope.launch { attachments.remove(id) }
+    }
+
+    fun fileFor(attachment: Attachment): java.io.File = attachments.fileFor(attachment)
+
     fun moveToTrash() {
         viewModelScope.launch {
             saveJob?.cancel()
@@ -352,6 +399,7 @@ class NoteEditorViewModel(
                     savedStateHandle = createSavedStateHandle(),
                     repository = container.noteRepository,
                     organization = container.organizationRepository,
+                    attachments = container.attachmentRepository,
                     appScope = container.applicationScope,
                     clock = container.clock,
                 )

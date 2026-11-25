@@ -9,6 +9,8 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.nexusnotes.core.common.Clock
 import com.nexusnotes.core.common.WallClock
 import com.nexusnotes.core.database.NexusDatabase
+import com.nexusnotes.core.storage.AttachmentStore
+import com.nexusnotes.data.repository.AttachmentRepository
 import com.nexusnotes.data.repository.NoteRepository
 import com.nexusnotes.data.repository.OfflineNoteRepository
 import com.nexusnotes.data.repository.OrganizationRepository
@@ -17,6 +19,7 @@ import com.nexusnotes.data.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -35,7 +38,15 @@ class AppContainer(context: Context) {
 
     val database: NexusDatabase by lazy { NexusDatabase.build(appContext) }
 
-    val noteRepository: NoteRepository by lazy { OfflineNoteRepository(database.noteDao(), clock) }
+    val noteRepository: NoteRepository by lazy {
+        OfflineNoteRepository(database.noteDao(), clock) { attachmentRepository }
+    }
+
+    val attachmentStore: AttachmentStore by lazy { AttachmentStore(appContext) }
+
+    val attachmentRepository: AttachmentRepository by lazy {
+        AttachmentRepository(database.attachmentDao(), database.noteDao(), attachmentStore, clock)
+    }
 
     val organizationRepository: OrganizationRepository by lazy {
         OrganizationRepository(database.folderDao(), database.tagDao(), clock)
@@ -58,6 +69,9 @@ suspend fun AppContainer.openDatabase(): Result<Unit> = withContext(Dispatchers.
     runCatching {
         database.openHelper.writableDatabase
         Unit
+    }.onSuccess {
+        // Housekeeping: remove attachment files left behind by deleted notes.
+        applicationScope.launch { runCatching { attachmentRepository.cleanUpFiles() } }
     }
 }
 
