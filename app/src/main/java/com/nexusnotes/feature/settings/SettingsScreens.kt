@@ -295,10 +295,10 @@ fun AboutScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(spacing.lg))
             SectionHeader("Build status")
             Text(
-                "Milestone 9 of 10: notes, Markdown editor, folders, tags, offline search, the AI " +
-                    "Prompt Library, attachments, the encrypted Private Vault, verified backup/restore " +
-                    "and export, reminders, templates, a home-screen widget, quick-note shortcuts and " +
-                    "optional AI tools.",
+                "Release candidate 1.0: private, offline notes with a Markdown editor, folders, tags, " +
+                    "full-text search, the AI Prompt Library, attachments, an encrypted Private Vault, " +
+                    "verified backup/restore and export, reminders, templates, a home-screen widget and " +
+                    "optional AI tools. No ads, no tracking, no internet access.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

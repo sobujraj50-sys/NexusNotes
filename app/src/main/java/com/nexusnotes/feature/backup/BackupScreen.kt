@@ -249,6 +249,15 @@ fun BackupScreen(
                 }
             }
 
+            item { SectionHeader("Maintenance", Modifier.padding(top = spacing.md)) }
+            item {
+                NexusListRow(
+                    Icons.Filled.CheckCircle, "Check database health",
+                    supporting = "Integrity check of notes, links and attachment files. Changes nothing.",
+                    onClick = if (enabled) ({ viewModel.checkHealth() }) else null,
+                )
+            }
+
             item { SectionHeader("History", Modifier.padding(top = spacing.md)) }
             if (history.isEmpty()) {
                 item { Text("No backups yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }

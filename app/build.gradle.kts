@@ -23,7 +23,7 @@ android {
         targetSdk = 36
         // CI passes -PversionCode=<run number> so every build is a valid update.
         versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-        versionName = "0.9.0-m9"
+        versionName = "1.0.0-rc1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -44,8 +44,10 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
-            // R8 is enabled in Milestone 10 together with keep rules and a signing config.
-            isMinifyEnabled = false
+            // R8: removes unused library code and optimises Compose (smaller, faster APK).
+            // Our own classes keep their names (see proguard-rules.pro) so crash reports stay readable.
+            isMinifyEnabled = true
+            isShrinkResources = true
             if (hasNexusKeystore) {
                 signingConfig = signingConfigs.getByName("nexus")
             }

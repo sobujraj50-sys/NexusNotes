@@ -11,6 +11,11 @@ class NexusNotesApp : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashReporter.install(this, BuildConfig.VERSION_NAME)
+        if (BuildConfig.DEBUG) {
+            // Development aid: report disk/network work on the main thread and leaked resources in Logcat.
+            android.os.StrictMode.setThreadPolicy(android.os.StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog().build())
+            android.os.StrictMode.setVmPolicy(android.os.StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().penaltyLog().build())
+        }
         container = AppContainer(this)
         AppShortcuts.publish(this)
         registerActivityLifecycleCallbacks(

@@ -69,6 +69,7 @@ class VaultRepository(
 
     suspend fun refresh() = withContext(Dispatchers.IO) {
         _isSetUp.value = runCatching { keys.isSetUp() }.getOrDefault(false)
+        cachedAutoLockMs = runCatching { keys.meta()?.autoLockMs }.getOrNull()
     }
 
     // ---- keys -------------------------------------------------------------------------
@@ -99,10 +100,16 @@ class VaultRepository(
 
     suspend fun autoLockMs(): Long = withContext(Dispatchers.IO) { keys.meta()?.autoLockMs ?: VaultPolicy.DEFAULT_AUTO_LOCK_MS }
 
-    /** Fast read used by the auto-lock (called on the main thread; tiny file). */
-    fun autoLockMsBlocking(): Long = runCatching { keys.meta()?.autoLockMs }.getOrNull() ?: VaultPolicy.DEFAULT_AUTO_LOCK_MS
+    @Volatile private var cachedAutoLockMs: Long? = null
 
-    suspend fun setAutoLock(ms: Long) = withContext(Dispatchers.IO) { keys.setAutoLock(ms) }
+    /** Used by the auto-lock on the main thread: served from memory once known (no disk read). */
+    fun autoLockMsBlocking(): Long = cachedAutoLockMs
+        ?: (runCatching { keys.meta()?.autoLockMs }.getOrNull() ?: VaultPolicy.DEFAULT_AUTO_LOCK_MS).also { cachedAutoLockMs = it }
+
+    suspend fun setAutoLock(ms: Long) = withContext(Dispatchers.IO) {
+        keys.setAutoLock(ms)
+        cachedAutoLockMs = ms
+    }
 
     /** Cipher for the biometric prompt to unlock. Throws BiometricKeyInvalidatedException (biometrics turned off). */
     suspend fun biometricUnlockCipher(): Cipher = withContext(Dispatchers.IO) {

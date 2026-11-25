@@ -328,6 +328,29 @@ class BackupRepository(
         )
     }
 
+    // ---- health -----------------------------------------------------------------------
+
+    /** SQLite integrity + foreign-key check and attachment files. Read-only; changes nothing. */
+    suspend fun checkHealth(): List<String> = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            val db = database.openHelper.writableDatabase
+            val lines = mutableListOf<String>()
+            db.query("PRAGMA integrity_check").use { c ->
+                val results = generateSequence { if (c.moveToNext()) c.getString(0) else null }.take(20).toList()
+                lines += if (results == listOf("ok")) "Database structure: OK" else "Database problems: " + results.joinToString("; ")
+            }
+            db.query("PRAGMA foreign_key_check").use { c ->
+                lines += if (c.count == 0) "Links between notes, tags and files: OK" else "Broken links found: ${c.count}"
+            }
+            val atts = dao.attachments()
+            val missing = atts.count { !attachmentStore.exists(it.fileName) }
+            lines += if (missing == 0) "Attachment files: all ${atts.size} present" else "Attachment files: $missing of ${atts.size} missing (shown as “Missing” in notes)"
+            lines += "Notes: ${dao.notes().size} · Prompts: ${dao.prompts().size} · DB version ${NexusDatabase.VERSION}"
+            record("CHECK", "database", 0, lines.first(), lines.none { it.contains("problems") || it.contains("Broken") })
+            lines
+        }
+    }
+
     // ---- helpers ----------------------------------------------------------------------
 
     suspend fun record(kind: String, fileName: String, size: Long, summary: String, success: Boolean) {

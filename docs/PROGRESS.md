@@ -36,3 +36,6 @@ Verified ZIP backups (SHA-256 manifest), optional encrypted vault with backup pa
 
 ## Milestone 9 — Reminders, templates, widget, quick notes, auto backup, optional AI (0.9.0-m9) — delivered, awaiting test
 AlarmManager reminders with repeat/snooze/boot re-arm, built-in + user templates, launcher shortcuts, RemoteViews widget, JobScheduler automatic backups with retention, offline AI prompt builder (no INTERNET permission), DB v7. Unit tests: 199 pass locally; v1→v7 migration verified on SQLite.
+
+## Milestone 10 — Hardening & release candidate (1.0.0-rc1) — delivered, awaiting green build + device test plan
+R8, health check, perf tests, security review, release/test docs. Unit tests: 204 pass locally.

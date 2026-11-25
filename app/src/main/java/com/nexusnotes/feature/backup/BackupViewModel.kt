@@ -187,6 +187,14 @@ class BackupViewModel(
         }
     }
 
+    fun checkHealth() {
+        run("Checking database…") {
+            runCatching { backups.checkHealth() }
+                .onSuccess { lines -> report("Database health", lines.none { it.contains("problems") || it.contains("Broken") }, *lines.toTypedArray()) }
+                .onFailure { report("Check failed", false, it.message ?: "Unknown error") }
+        }
+    }
+
     fun export(format: ExportFormat, target: Uri, fileName: String) {
         run("Exporting…") {
             exports.export(format, target, fileName)
