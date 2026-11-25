@@ -61,6 +61,14 @@ class AttachmentStore(context: Context) {
         Stored(fileName, displayName, mime, size, sha)
     }
 
+    /** Stores bytes from [input] (e.g. decrypted vault content moved back into normal notes). */
+    suspend fun importStream(input: InputStream, id: String, displayName: String, mimeType: String): Stored = withContext(Dispatchers.IO) {
+        val safeName = AttachmentPolicy.safeDisplayName(displayName, fallback = "attachment")
+        val fileName = id + extensionFor(mimeType, safeName).let { if (it.isEmpty()) "" else ".$it" }
+        val (size, sha) = writeVerified(input, fileName)
+        Stored(fileName, safeName, mimeType, size, sha)
+    }
+
     /** A fresh pending file for an audio recording. */
     fun newRecordingFile(id: String): File = File(directory, "$PENDING$id.m4a")
 

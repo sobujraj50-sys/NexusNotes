@@ -47,6 +47,17 @@ class AttachmentRepository(
         insertOrDeleteFile(noteId, id, stored, AttachmentPolicy.kindFor(stored.mimeType), null, folderIdForNew)
     }
 
+    suspend fun listForNote(noteId: String): List<Attachment> = dao.getForNote(noteId).map { it.toDomain() }
+
+    suspend fun addFromStream(noteId: String, input: java.io.InputStream, displayName: String, mimeType: String): Attachment {
+        val id = UUID.randomUUID().toString()
+        val stored = input.use { store.importStream(it, id, displayName, mimeType) }
+        return insertOrDeleteFile(noteId, id, stored, AttachmentPolicy.kindFor(stored.mimeType), null, null)
+    }
+
+    /** Deletes the file of an attachment right away (used when its note moves into the vault). */
+    suspend fun deleteFileNow(attachment: Attachment) = store.delete(attachment.fileName)
+
     fun newRecording(): Pair<String, File> {
         val id = UUID.randomUUID().toString()
         return id to store.newRecordingFile(id)

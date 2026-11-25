@@ -40,9 +40,32 @@ object BitmapLoader {
         }.getOrNull()?.also { cache.put(key, it) }
     }
 
+    /** Decodes decrypted image bytes in memory (vault images are never written out as plain files). Not cached. */
+    suspend fun decode(bytes: ByteArray, maxEdge: Int): ImageBitmap? = withContext(Dispatchers.Default) {
+        runCatching {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = AttachmentPolicy.inSampleSize(bounds.outWidth, bounds.outHeight, maxEdge)
+            }
+            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return@runCatching null
+            val orientation = runCatching {
+                ExifInterface(java.io.ByteArrayInputStream(bytes)).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+            rotateBy(decoded, orientation).asImageBitmap()
+        }.getOrNull()
+    }
+
     private fun rotate(bitmap: Bitmap, file: File): Bitmap {
+        val orientation = runCatching {
+            ExifInterface(file.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+        return rotateBy(bitmap, orientation)
+    }
+
+    private fun rotateBy(bitmap: Bitmap, orientation: Int): Bitmap {
         val degrees = runCatching {
-            when (ExifInterface(file.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+            when (orientation) {
                 ExifInterface.ORIENTATION_ROTATE_90 -> 90f
                 ExifInterface.ORIENTATION_ROTATE_180 -> 180f
                 ExifInterface.ORIENTATION_ROTATE_270 -> 270f

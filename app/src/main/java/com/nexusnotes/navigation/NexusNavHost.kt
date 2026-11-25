@@ -28,6 +28,7 @@ import com.nexusnotes.feature.search.SearchScreen
 import com.nexusnotes.feature.settings.AboutScreen
 import com.nexusnotes.feature.settings.SettingsScreen
 import com.nexusnotes.feature.tags.TagsScreen
+import com.nexusnotes.feature.vault.VaultEditorScreen
 import com.nexusnotes.feature.vault.VaultScreen
 
 private const val ANIM_MS = 220
@@ -77,6 +78,7 @@ fun NexusNavHost(
         ) {
             NoteEditorScreen(
                 onBack = back,
+                onOpenVault = { navigate(NexusDestination.Vault.route) },
                 onOpenNote = { id ->
                     // Replace the current editor with the duplicate.
                     navController.navigate(NexusDestination.NoteEditor.createRoute(id)) {
@@ -137,7 +139,23 @@ fun NexusNavHost(
         ) { PromptRunnerScreen(onBack = back) }
 
         // Security, data and app info
-        composable(NexusDestination.Vault.route) { VaultScreen(onBack = back) }
+        composable(NexusDestination.Vault.route) {
+            VaultScreen(onBack = back, onOpenItem = { id -> navigate(NexusDestination.VaultEditor.createRoute(id)) })
+        }
+        composable(
+            route = NexusDestination.VaultEditor.route,
+            arguments = listOf(optionalString(ARG_VAULT_ITEM_ID)),
+        ) {
+            VaultEditorScreen(
+                onBack = back,
+                onOpenNote = { noteId ->
+                    // The vault note no longer exists: replace it with the normal note.
+                    navController.navigate(NexusDestination.NoteEditor.createRoute(noteId)) {
+                        popUpTo(NexusDestination.VaultEditor.route) { inclusive = true }
+                    }
+                },
+            )
+        }
         composable(NexusDestination.Backup.route) { BackupScreen(onBack = back) }
         composable(NexusDestination.About.route) { AboutScreen(onBack = back) }
     }

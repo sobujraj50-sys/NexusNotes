@@ -5,6 +5,7 @@ const val ARG_FOLDER_ID = "folderId"
 const val ARG_PROMPT_ID = "promptId"
 const val ARG_TAG_ID = "tagId"
 const val ARG_CATEGORY = "category"
+const val ARG_VAULT_ITEM_ID = "vaultItemId"
 
 /** Virtual folder id for notes that have no folder. Never stored as a real folder row. */
 const val UNFILED_FOLDER_ID = "unfiled"
@@ -56,6 +57,10 @@ sealed class NexusDestination(val route: String, val title: String) {
     data object Archive : NexusDestination("archive", "Archive")
     data object Trash : NexusDestination("trash", "Trash")
     data object Vault : NexusDestination("vault", "Private Vault")
+
+    data object VaultEditor : NexusDestination("vault/editor?$ARG_VAULT_ITEM_ID={$ARG_VAULT_ITEM_ID}", "Vault note") {
+        fun createRoute(itemId: String? = null): String = withQuery("vault/editor", ARG_VAULT_ITEM_ID to itemId)
+    }
     data object Backup : NexusDestination("backup", "Backup & Restore")
     data object Settings : NexusDestination("settings", "Settings")
     data object About : NexusDestination("about", "About")
@@ -92,6 +97,7 @@ object NexusDestinations {
             NexusDestination.Archive,
             NexusDestination.Trash,
             NexusDestination.Vault,
+            NexusDestination.VaultEditor,
             NexusDestination.Backup,
             NexusDestination.Settings,
             NexusDestination.About,

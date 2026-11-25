@@ -16,6 +16,13 @@ import com.nexusnotes.data.repository.OfflineNoteRepository
 import com.nexusnotes.data.repository.OrganizationRepository
 import com.nexusnotes.data.repository.PromptRepository
 import com.nexusnotes.data.repository.SettingsRepository
+import com.nexusnotes.data.repository.VaultRepository
+import com.nexusnotes.core.security.BiometricKey
+import com.nexusnotes.core.security.FileVaultMetaStore
+import com.nexusnotes.core.security.KeystoreDeviceKey
+import com.nexusnotes.core.security.VaultFileStore
+import com.nexusnotes.core.security.VaultSession
+import com.nexusnotes.domain.vault.VaultKeyManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -58,6 +65,24 @@ class AppContainer(context: Context) {
     val contentResolver: android.content.ContentResolver get() = appContext.contentResolver
 
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext.settingsDataStore) }
+
+    /** In-memory vault key holder. Locked at process start. */
+    val vaultSession = VaultSession(applicationScope)
+
+    val vaultRepository: VaultRepository by lazy {
+        VaultRepository(
+            database = database,
+            keys = VaultKeyManager(KeystoreDeviceKey(), FileVaultMetaStore(appContext), clock::now),
+            biometric = BiometricKey(),
+            files = VaultFileStore(appContext),
+            session = vaultSession,
+            notes = noteRepository,
+            attachments = attachmentRepository,
+            resolver = appContext.contentResolver,
+            clock = clock,
+            deleteDatabaseBackups = { com.nexusnotes.core.database.DatabaseSafety.deleteBackups(appContext) },
+        )
+    }
 }
 
 /**
@@ -71,7 +96,11 @@ suspend fun AppContainer.openDatabase(): Result<Unit> = withContext(Dispatchers.
         Unit
     }.onSuccess {
         // Housekeeping: remove attachment files left behind by deleted notes.
-        applicationScope.launch { runCatching { attachmentRepository.cleanUpFiles() } }
+        applicationScope.launch {
+            runCatching { attachmentRepository.cleanUpFiles() }
+            vaultRepository.cleanUpFiles()
+            vaultRepository.refresh()
+        }
     }
 }
 

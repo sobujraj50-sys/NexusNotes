@@ -41,3 +41,6 @@ Personal project: record issues in docs/PROGRESS.md.
 - Microphone permission is requested only when recording starts.
 - Files are shared out only on explicit user action, through FileProvider with a temporary read grant.
 - Shared-in content is treated as untrusted: only content:// URIs, size limits, sanitized names.
+
+## Private Vault (M7)
+See docs/MILESTONE_7.md for the full design and threat model. Summary: AES-256-GCM with per-record AAD; vault key wrapped by PBKDF2(PIN, 210k) and a non-exportable Android Keystore key; optional biometric Keystore key (strong, invalidated on enrolment change); no PIN or PIN hash stored; attempt counter with growing lockout; vault data outside notes/FTS; FLAG_SECURE; secure_delete + WAL checkpoint after moving notes in; old DB upgrade copies deleted after a move. No recovery without the PIN — by design.

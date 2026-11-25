@@ -27,3 +27,6 @@
 
 ## Milestone 6 — Attachments (0.6.0-m6) — delivered, awaiting test
 Photo/audio/file attachments, image viewer, audio recorder/player, Share to Nexus Notes, missing-file recovery, storage cleanup, DB v4. Unit tests: 125 pass locally; v1→v4 migration verified on SQLite.
+
+## Milestone 7 — Private Vault (0.7.0-m7) — delivered, awaiting test
+AES-256-GCM vault with PIN (PBKDF2 + Android Keystore) and biometric unlock, encrypted notes and attachments, move to/out of vault, auto-lock, attempt limits, FLAG_SECURE, DB v5. Unit tests: 154 pass locally; v1→v5 migration verified on SQLite.

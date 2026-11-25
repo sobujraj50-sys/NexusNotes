@@ -34,6 +34,15 @@ object DatabaseSafety {
         temp.renameTo(backup)
     }
 
+    /**
+     * Removes the pre-upgrade copies. Called when a note moves into the vault: an old copy could
+     * still hold that note as plain text.
+     */
+    fun deleteBackups(context: Context) {
+        val dir = context.getDatabasePath(NexusDatabase.NAME).parentFile ?: return
+        dir.listFiles().orEmpty().filter { it.name.startsWith("nexus-backup-v") }.forEach { it.delete() }
+    }
+
     private fun readVersion(dbFile: File): Int? = runCatching {
         SQLiteDatabase.openDatabase(dbFile.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
     }.getOrNull()

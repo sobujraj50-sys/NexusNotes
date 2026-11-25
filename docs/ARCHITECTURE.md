@@ -111,6 +111,8 @@ Room database `nexus.db`, `exportSchema = true`, schemas committed under `app/sc
 | FolderEntity (**built v2**) | id, name, parentId?, colorIndex?, createdAt | No SQL FK; FolderDao deletes subtrees and unfiles their notes in one transaction. FolderTree blocks loops; max depth 8; sibling names unique (case-insensitive, enforced in code). |
 | TagEntity (**built v2**) | id, name | Unique index on name; case-insensitive uniqueness enforced in TagDao. |
 | NoteTagCrossRef (**built v2**) | noteId, tagId | Composite PK; both FKs CASCADE; index on tagId. |
+| VaultItemEntity (v5) | id, payload BLOB (encrypted title+body), createdAt, updatedAt | Not linked to notes/FTS; nothing searchable. |
+| VaultAttachmentEntity (v5) | id, itemId, fileName, payload BLOB (encrypted name/type/size), createdAt | FK itemId CASCADE; bytes in `filesDir/vault/files/*.nxv`, chunked AES-GCM. |
 | AttachmentEntity | id, noteId, type, fileName (internal), displayName, mimeType, sizeBytes, sha256, createdAt | FK noteId CASCADE; files live in `filesDir/attachments/`, never as blobs. |
 | PromptEntity (**built v3**) | id, title, template, categoryKey, isFavorite, createdAt, updatedAt | categoryKey = `PromptCategory.name` or custom category id. FTS table for prompts too. |
 | PromptCategoryEntity (**built v3**) | id, name, createdAt | User-defined categories (built-ins come from the enum). |

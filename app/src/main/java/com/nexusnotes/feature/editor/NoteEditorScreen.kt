@@ -67,6 +67,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
@@ -121,10 +122,15 @@ const val EDITOR_STATUS_TAG = "editor_status"
 fun NoteEditorScreen(
     onBack: () -> Unit,
     onOpenNote: (String) -> Unit,
+    onOpenVault: () -> Unit = {},
     viewModel: NoteEditorViewModel = viewModel(factory = NoteEditorViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val vaultSetUp by viewModel.vaultSetUp.collectAsStateWithLifecycle()
+    val vaultUnlocked by viewModel.vaultUnlocked.collectAsStateWithLifecycle()
+    var vaultDialog by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Save immediately when the app goes to the background or the screen is left.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.flush() }
@@ -135,6 +141,10 @@ fun NoteEditorScreen(
                 EditorEvent.Close -> onBack()
                 is EditorEvent.OpenNote -> onOpenNote(event.id)
                 is EditorEvent.Message -> snackbar.showSnackbar(event.text)
+                is EditorEvent.CloseWithMessage -> {
+                    android.widget.Toast.makeText(context, event.text, android.widget.Toast.LENGTH_SHORT).show()
+                    onBack()
+                }
             }
         }
     }
@@ -148,7 +158,6 @@ fun NoteEditorScreen(
     var showColorDialog by rememberSaveable { mutableStateOf(false) }
     var showFolderPicker by rememberSaveable { mutableStateOf(false) }
     var showAddTag by rememberSaveable { mutableStateOf(false) }
-    val context = LocalContext.current
     var recording by remember { mutableStateOf<Pair<String, java.io.File>?>(null) }
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.attach(uri)
@@ -296,6 +305,18 @@ fun NoteEditorScreen(
                                 onClick = { menuOpen = false; viewModel.toggleArchived() },
                             )
                             DropdownMenuItem(
+                                text = { Text("Move to Vault") },
+                                leadingIcon = { Icon(Icons.Filled.Lock, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    vaultDialog = when {
+                                        vaultSetUp != true -> "setup"
+                                        vaultUnlocked -> "confirm"
+                                        else -> "unlock"
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Move to Trash") },
                                 leadingIcon = { Icon(Icons.Filled.Delete, null) },
                                 onClick = { menuOpen = false; viewModel.moveToTrash() },
@@ -373,6 +394,36 @@ fun NoteEditorScreen(
     }
     if (showInfoDialog && note != null) {
         NoteInfoDialog(state = state, onDismiss = { showInfoDialog = false })
+    }
+    when (vaultDialog) {
+        "setup" -> com.nexusnotes.core.design.components.ConfirmDialog(
+            title = "Set up the vault first",
+            message = "Create your vault PIN in Private Vault, then come back to move this note.",
+            confirmLabel = "Open Private Vault",
+            onConfirm = {
+                vaultDialog = null
+                viewModel.flush()
+                onOpenVault()
+            },
+            onDismiss = { vaultDialog = null },
+        )
+        "unlock" -> com.nexusnotes.feature.vault.VaultUnlockDialog(
+            title = "Unlock vault",
+            message = "Enter your vault PIN to move this note into the vault.",
+            onUnlock = { pin -> viewModel.unlockVault(pin).also { if (it == null) vaultDialog = "confirm" } },
+            onDismiss = { vaultDialog = null },
+        )
+        "confirm" -> com.nexusnotes.core.design.components.ConfirmDialog(
+            title = "Move to Vault?",
+            message = "The note and its attachments are encrypted into the vault, and the normal copy is deleted " +
+                "forever (it won't be in Trash or search). Folder and tags are not kept.",
+            confirmLabel = "Move",
+            onConfirm = {
+                vaultDialog = null
+                viewModel.moveToVault()
+            },
+            onDismiss = { vaultDialog = null },
+        )
     }
     recording?.let { (id, file) ->
         RecordAudioDialog(

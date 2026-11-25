@@ -81,6 +81,7 @@ sealed interface EditorEvent {
     data object Close : EditorEvent
     data class OpenNote(val id: String) : EditorEvent
     data class Message(val text: String) : EditorEvent
+    data class CloseWithMessage(val text: String) : EditorEvent
 }
 
 /**
@@ -99,6 +100,7 @@ class NoteEditorViewModel(
     private val repository: NoteRepository,
     private val organization: OrganizationRepository,
     private val attachments: AttachmentRepository,
+    private val vault: com.nexusnotes.data.repository.VaultRepository,
     private val appScope: CoroutineScope,
     private val clock: Clock,
 ) : ViewModel() {
@@ -121,6 +123,9 @@ class NoteEditorViewModel(
 
     @Volatile
     private var hasUnsavedChanges = false
+
+    /** Set once the note was moved into the vault: the plaintext must never be written again. */
+    @Volatile private var movedToVault = false
 
     init {
         viewModelScope.launch {
@@ -312,6 +317,45 @@ class NoteEditorViewModel(
         }
     }
 
+    // ---- Vault ----
+
+    val vaultSetUp = vault.isSetUp
+    val vaultUnlocked = vault.unlocked
+
+    /** Returns an error message, or null when unlocked. */
+    suspend fun unlockVault(pin: String): String? {
+        val chars = pin.toCharArray()
+        val r = vault.unlock(chars)
+        chars.fill(' ')
+        return when (r) {
+            is com.nexusnotes.domain.vault.UnlockResult.Success -> null
+            is com.nexusnotes.domain.vault.UnlockResult.WrongPin -> if (r.lockedUntil > 0) "Wrong PIN. Too many attempts — wait and try again." else "Wrong PIN."
+            is com.nexusnotes.domain.vault.UnlockResult.LockedOut -> "Too many wrong attempts. Try again later."
+            com.nexusnotes.domain.vault.UnlockResult.KeysLost -> "The vault can't be opened on this phone. Open Private Vault for details."
+            com.nexusnotes.domain.vault.UnlockResult.NotSetUp -> "Set up the vault first."
+        }
+    }
+
+    /** Encrypts this note into the vault and deletes the plaintext original. Vault must be unlocked. */
+    fun moveToVault() {
+        viewModelScope.launch {
+            saveJob?.cancel()
+            val result = withContext(NonCancellable) {
+                saveNow()
+                if (!_uiState.value.isStored) return@withContext Result.failure(IllegalStateException("Write something first."))
+                movedToVault = true
+                hasUnsavedChanges = false
+                vault.moveNoteToVault(noteId)
+            }
+            result.onSuccess {
+                _events.send(EditorEvent.CloseWithMessage("Moved to the vault and encrypted."))
+            }.onFailure {
+                movedToVault = false
+                _events.send(EditorEvent.Message(it.message ?: "Could not move the note."))
+            }
+        }
+    }
+
     fun duplicate() {
         viewModelScope.launch {
             saveJob?.cancel()
@@ -351,6 +395,7 @@ class NoteEditorViewModel(
     }
 
     private fun markDirty() {
+        if (movedToVault) return
         hasUnsavedChanges = true
         _uiState.update {
             it.copy(canUndo = history.canUndo, canRedo = history.canRedo, saveState = SaveState.PENDING)
@@ -365,7 +410,7 @@ class NoteEditorViewModel(
     /** Saves the latest text. Serialized by a mutex; always writes the newest state. */
     private suspend fun saveNow() {
         saveMutex.withLock {
-            if (!hasUnsavedChanges) return
+            if (!hasUnsavedChanges || movedToVault) return
             hasUnsavedChanges = false
             val state = _uiState.value
             _uiState.update { it.copy(saveState = SaveState.SAVING) }
@@ -400,6 +445,7 @@ class NoteEditorViewModel(
                     repository = container.noteRepository,
                     organization = container.organizationRepository,
                     attachments = container.attachmentRepository,
+                    vault = container.vaultRepository,
                     appScope = container.applicationScope,
                     clock = container.clock,
                 )

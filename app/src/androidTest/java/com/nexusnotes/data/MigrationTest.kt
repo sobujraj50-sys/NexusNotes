@@ -95,6 +95,13 @@ class MigrationTest {
             dao.deletePermanently("c")
             assertEquals(null, db.attachmentDao().getById("att1"))
 
+            // Vault tables exist (v5); deleting a vault item removes its attachment rows.
+            val vdao = db.vaultDao()
+            vdao.upsertItem(com.nexusnotes.data.entity.VaultItemEntity("v1", byteArrayOf(1, 2, 3), 1, 1))
+            vdao.insertAttachment(com.nexusnotes.data.entity.VaultAttachmentEntity("va1", "v1", "va1.nxv", byteArrayOf(4), 1))
+            vdao.deleteItem("v1")
+            assertEquals(null, vdao.getAttachment("va1"))
+
             // The index follows later edits (sync triggers exist).
             dao.updateContent("a", "Shopping list", "eggs", 50)
             assertEquals(0, dao.search("\"milk*\"", null, false, null, false, 50).first().size)

@@ -83,7 +83,7 @@ fun SettingsScreen(
                 NexusListRow(
                     Icons.Filled.Lock,
                     "Private vault",
-                    supporting = "PIN, biometrics and encryption",
+                    supporting = "Encrypted notes · PIN & fingerprint",
                     onClick = { onNavigate(NexusDestination.Vault.route) },
                 )
             }
@@ -224,7 +224,7 @@ fun AboutScreen(onBack: () -> Unit) {
     val promises = listOf(
         "No ads and no tracking SDKs",
         "No account and no subscription",
-        "Works fully offline — the only permission is the microphone, asked only when you record",
+        "Works fully offline — microphone is asked only when you record; fingerprint only for the vault",
         "Notes are stored only in this app's private storage on this phone",
         "Nothing is uploaded without your explicit consent",
         "Android cloud backup is disabled for this app",
@@ -273,9 +273,9 @@ fun AboutScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(spacing.lg))
             SectionHeader("Build status")
             Text(
-                "Milestone 6 of 10: notes with autosave, Markdown editor, folders, tags, offline " +
-                    "search, the AI Prompt Library, and image/audio/file attachments with Share to " +
-                    "Nexus Notes. Features marked with a milestone badge are not built yet.",
+                "Milestone 7 of 10: notes with autosave, Markdown editor, folders, tags, offline " +
+                    "search, the AI Prompt Library, attachments, and the encrypted Private Vault with " +
+                    "PIN and fingerprint unlock. Features marked with a milestone badge are not built yet.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
