@@ -60,9 +60,9 @@ object BiometricUnlock {
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    // The "Use PIN" button is reported through its own listener above.
                     val cancelled = errorCode == BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED ||
-                        errorCode == BiometricPrompt.BIOMETRIC_ERROR_CANCELED ||
-                        errorCode == BiometricPrompt.BIOMETRIC_ERROR_NEGATIVE_BUTTON
+                        errorCode == BiometricPrompt.BIOMETRIC_ERROR_CANCELED
                     onError(if (cancelled) null else errString.toString())
                 }
                 // onAuthenticationFailed (a non-matching finger) — the system prompt shows it and lets the user retry.
