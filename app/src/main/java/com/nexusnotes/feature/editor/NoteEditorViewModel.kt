@@ -101,6 +101,7 @@ class NoteEditorViewModel(
     private val organization: OrganizationRepository,
     private val attachments: AttachmentRepository,
     private val vault: com.nexusnotes.data.repository.VaultRepository,
+    private val exports: com.nexusnotes.data.repository.ExportRepository,
     private val appScope: CoroutineScope,
     private val clock: Clock,
 ) : ViewModel() {
@@ -317,6 +318,18 @@ class NoteEditorViewModel(
         }
     }
 
+    // ---- Export ----
+
+    fun exportNote(format: com.nexusnotes.domain.backup.ExportFormat, target: android.net.Uri) {
+        viewModelScope.launch {
+            saveJob?.cancel()
+            withContext(NonCancellable) { saveNow() }
+            exports.export(format, target, "note", setOf(noteId))
+                .onSuccess { _events.send(EditorEvent.Message("Exported.")) }
+                .onFailure { _events.send(EditorEvent.Message(it.message ?: "Export failed.")) }
+        }
+    }
+
     // ---- Vault ----
 
     val vaultSetUp = vault.isSetUp
@@ -446,6 +459,7 @@ class NoteEditorViewModel(
                     organization = container.organizationRepository,
                     attachments = container.attachmentRepository,
                     vault = container.vaultRepository,
+                    exports = container.exportRepository,
                     appScope = container.applicationScope,
                     clock = container.clock,
                 )

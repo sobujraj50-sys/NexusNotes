@@ -48,9 +48,11 @@ fun PinField(
     imeAction: ImeAction = ImeAction.Done,
     onDone: () -> Unit = {},
     enabled: Boolean = true,
+    /** Start with the full keyboard (for passwords) instead of the number pad. */
+    startWithText: Boolean = false,
 ) {
     var visible by remember { mutableStateOf(false) }
-    var textKeyboard by remember { mutableStateOf(false) }
+    var textKeyboard by remember { mutableStateOf(startWithText) }
     OutlinedTextField(
         value = value,
         onValueChange = { if (it.length <= 64 && '\n' !in it) onValueChange(it) },

@@ -102,6 +102,9 @@ class MigrationTest {
             vdao.deleteItem("v1")
             assertEquals(null, vdao.getAttachment("va1"))
 
+            // Backup history table exists (v6).
+            db.backupDao().insertHistory(com.nexusnotes.data.entity.BackupHistoryEntity("h1", 1, "BACKUP", "b.zip", 10, "ok", true))
+
             // The index follows later edits (sync triggers exist).
             dao.updateContent("a", "Shopping list", "eggs", 50)
             assertEquals(0, dao.search("\"milk*\"", null, false, null, false, 50).first().size)

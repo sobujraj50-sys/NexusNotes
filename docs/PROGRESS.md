@@ -30,3 +30,6 @@ Photo/audio/file attachments, image viewer, audio recorder/player, Share to Nexu
 
 ## Milestone 7 — Private Vault (0.7.0-m7) — delivered, awaiting test
 AES-256-GCM vault with PIN (PBKDF2 + Android Keystore) and biometric unlock, encrypted notes and attachments, move to/out of vault, auto-lock, attempt limits, FLAG_SECURE, DB v5. Unit tests: 154 pass locally; v1→v5 migration verified on SQLite.
+
+## Milestone 8 — Backup, Restore & Export (0.8.0-m8) — delivered, awaiting test
+Verified ZIP backups (SHA-256 manifest), optional encrypted vault with backup password, Merge/Replace restore in one transaction with safety copy and undo, TXT/Markdown/JSON/PDF export (all or one note), history, DB v6. Unit tests: 181 pass locally; v1→v6 migration verified on SQLite.

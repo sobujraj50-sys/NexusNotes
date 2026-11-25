@@ -11,6 +11,8 @@ import com.nexusnotes.core.common.WallClock
 import com.nexusnotes.core.database.NexusDatabase
 import com.nexusnotes.core.storage.AttachmentStore
 import com.nexusnotes.data.repository.AttachmentRepository
+import com.nexusnotes.data.repository.BackupRepository
+import com.nexusnotes.data.repository.ExportRepository
 import com.nexusnotes.data.repository.NoteRepository
 import com.nexusnotes.data.repository.OfflineNoteRepository
 import com.nexusnotes.data.repository.OrganizationRepository
@@ -65,6 +67,16 @@ class AppContainer(context: Context) {
     val contentResolver: android.content.ContentResolver get() = appContext.contentResolver
 
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext.settingsDataStore) }
+
+    val backupRepository: BackupRepository by lazy {
+        BackupRepository(appContext, database, attachmentStore, attachmentRepository, vaultRepository, clock, BuildConfig.VERSION_NAME)
+    }
+
+    val exportRepository: ExportRepository by lazy {
+        ExportRepository(database, attachmentStore, appContext.contentResolver, clock) { kind, name, summary, ok ->
+            backupRepository.record(kind, name, 0, summary, ok)
+        }
+    }
 
     /** In-memory vault key holder. Locked at process start. */
     val vaultSession = VaultSession(applicationScope)

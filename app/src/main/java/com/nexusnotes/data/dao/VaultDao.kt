@@ -13,6 +13,12 @@ interface VaultDao {
     @Query("SELECT * FROM vault_items ORDER BY updatedAt DESC")
     fun observeItems(): Flow<List<VaultItemEntity>>
 
+    @Query("SELECT * FROM vault_items")
+    suspend fun allItems(): List<VaultItemEntity>
+
+    @Query("SELECT * FROM vault_attachments")
+    suspend fun allAttachments(): List<VaultAttachmentEntity>
+
     @Query("SELECT * FROM vault_items WHERE id = :id")
     suspend fun getItem(id: String): VaultItemEntity?
 

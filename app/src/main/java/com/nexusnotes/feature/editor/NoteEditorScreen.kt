@@ -69,6 +69,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
@@ -131,6 +132,19 @@ fun NoteEditorScreen(
     val vaultSetUp by viewModel.vaultSetUp.collectAsStateWithLifecycle()
     val vaultUnlocked by viewModel.vaultUnlocked.collectAsStateWithLifecycle()
     var vaultDialog by rememberSaveable { mutableStateOf<String?>(null) }
+    var showExport by rememberSaveable { mutableStateOf(false) }
+    val exportMd = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/markdown")) { uri ->
+        uri?.let { viewModel.exportNote(com.nexusnotes.domain.backup.ExportFormat.MARKDOWN, it) }
+    }
+    val exportTxt = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        uri?.let { viewModel.exportNote(com.nexusnotes.domain.backup.ExportFormat.TEXT, it) }
+    }
+    val exportPdf = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        uri?.let { viewModel.exportNote(com.nexusnotes.domain.backup.ExportFormat.PDF, it) }
+    }
+    val exportJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let { viewModel.exportNote(com.nexusnotes.domain.backup.ExportFormat.JSON, it) }
+    }
 
     // Save immediately when the app goes to the background or the screen is left.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.flush() }
@@ -305,6 +319,11 @@ fun NoteEditorScreen(
                                 onClick = { menuOpen = false; viewModel.toggleArchived() },
                             )
                             DropdownMenuItem(
+                                text = { Text("Export…") },
+                                leadingIcon = { Icon(Icons.Filled.Share, null) },
+                                onClick = { menuOpen = false; showExport = true },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Move to Vault") },
                                 leadingIcon = { Icon(Icons.Filled.Lock, null) },
                                 onClick = {
@@ -394,6 +413,30 @@ fun NoteEditorScreen(
     }
     if (showInfoDialog && note != null) {
         NoteInfoDialog(state = state, onDismiss = { showInfoDialog = false })
+    }
+    if (showExport) {
+        val base = com.nexusnotes.domain.backup.NoteExport.fileName(state.title.text, "x", mutableSetOf()).removeSuffix(".x")
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showExport = false },
+            title = { Text("Export this note") },
+            text = {
+                androidx.compose.foundation.layout.Column {
+                    listOf("Markdown (.md)", "Plain text (.txt)", "PDF", "JSON").forEachIndexed { i, label ->
+                        androidx.compose.material3.TextButton(onClick = {
+                            showExport = false
+                            viewModel.flush()
+                            when (i) {
+                                0 -> exportMd.launch("$base.md")
+                                1 -> exportTxt.launch("$base.txt")
+                                2 -> exportPdf.launch("$base.pdf")
+                                else -> exportJson.launch("$base.json")
+                            }
+                        }) { Text(label) }
+                    }
+                }
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { showExport = false }) { Text("Cancel") } },
+        )
     }
     when (vaultDialog) {
         "setup" -> com.nexusnotes.core.design.components.ConfirmDialog(

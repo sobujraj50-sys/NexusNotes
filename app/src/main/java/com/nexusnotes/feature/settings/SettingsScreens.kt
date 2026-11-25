@@ -91,7 +91,7 @@ fun SettingsScreen(
                 NexusListRow(
                     NexusIcons.Backup,
                     "Backup & restore",
-                    supporting = "Local backups and exports",
+                    supporting = "Backup, restore and export",
                     onClick = { onNavigate(NexusDestination.Backup.route) },
                 )
             }
@@ -273,9 +273,10 @@ fun AboutScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(spacing.lg))
             SectionHeader("Build status")
             Text(
-                "Milestone 7 of 10: notes with autosave, Markdown editor, folders, tags, offline " +
-                    "search, the AI Prompt Library, attachments, and the encrypted Private Vault with " +
-                    "PIN and fingerprint unlock. Features marked with a milestone badge are not built yet.",
+                "Milestone 8 of 10: notes with autosave, Markdown editor, folders, tags, offline " +
+                    "search, the AI Prompt Library, attachments, the encrypted Private Vault, and " +
+                    "verified backup/restore with TXT, Markdown, JSON and PDF export. Features marked " +
+                    "with a milestone badge are not built yet.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

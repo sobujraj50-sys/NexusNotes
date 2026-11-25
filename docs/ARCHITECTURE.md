@@ -113,6 +113,7 @@ Room database `nexus.db`, `exportSchema = true`, schemas committed under `app/sc
 | NoteTagCrossRef (**built v2**) | noteId, tagId | Composite PK; both FKs CASCADE; index on tagId. |
 | VaultItemEntity (v5) | id, payload BLOB (encrypted title+body), createdAt, updatedAt | Not linked to notes/FTS; nothing searchable. |
 | VaultAttachmentEntity (v5) | id, itemId, fileName, payload BLOB (encrypted name/type/size), createdAt | FK itemId CASCADE; bytes in `filesDir/vault/files/*.nxv`, chunked AES-GCM. |
+| BackupHistoryEntity (v6) | id, createdAt, kind, fileName, sizeBytes, summary, success | No note content. |
 | AttachmentEntity | id, noteId, type, fileName (internal), displayName, mimeType, sizeBytes, sha256, createdAt | FK noteId CASCADE; files live in `filesDir/attachments/`, never as blobs. |
 | PromptEntity (**built v3**) | id, title, template, categoryKey, isFavorite, createdAt, updatedAt | categoryKey = `PromptCategory.name` or custom category id. FTS table for prompts too. |
 | PromptCategoryEntity (**built v3**) | id, name, createdAt | User-defined categories (built-ins come from the enum). |

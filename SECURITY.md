@@ -44,3 +44,9 @@ Personal project: record issues in docs/PROGRESS.md.
 
 ## Private Vault (M7)
 See docs/MILESTONE_7.md for the full design and threat model. Summary: AES-256-GCM with per-record AAD; vault key wrapped by PBKDF2(PIN, 210k) and a non-exportable Android Keystore key; optional biometric Keystore key (strong, invalidated on enrolment change); no PIN or PIN hash stored; attempt counter with growing lockout; vault data outside notes/FTS; FLAG_SECURE; secure_delete + WAL checkpoint after moving notes in; old DB upgrade copies deleted after a move. No recovery without the PIN — by design.
+
+## Backups (M8)
+- Written only to a user-chosen location (SAF); nothing is uploaded; Android auto-backup stays disabled.
+- Normal notes in a backup are NOT encrypted (the user is told); vault content stays AES-GCM encrypted, with the vault key wrapped by a separate backup password (PBKDF2 600k).
+- Restores verify SHA-256 of every entry, reject unknown/path-traversal entries and oversized archives, and write in one DB transaction.
+- Exports never contain vault notes or Trash.

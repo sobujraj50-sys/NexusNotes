@@ -11,6 +11,10 @@ import com.nexusnotes.core.security.VaultSession
 import com.nexusnotes.data.entity.VaultAttachmentEntity
 import com.nexusnotes.data.entity.VaultItemEntity
 import com.nexusnotes.domain.attachment.AttachmentPolicy
+import com.nexusnotes.domain.backup.VaultAttachmentRec
+import com.nexusnotes.domain.backup.VaultBackupKey
+import com.nexusnotes.domain.backup.VaultItemRec
+import com.nexusnotes.domain.backup.VaultKeyRec
 import com.nexusnotes.domain.vault.UnlockResult
 import com.nexusnotes.domain.vault.VaultAttachment
 import com.nexusnotes.domain.vault.VaultCodec
@@ -30,6 +34,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.util.Base64
 import java.util.UUID
 import javax.crypto.Cipher
 
@@ -304,6 +309,77 @@ class VaultRepository(
 
     suspend fun cleanUpFiles() = withContext(Dispatchers.IO) {
         runCatching { files.cleanUp(dao.allFileNames().toSet(), clock.now()) }
+    }
+
+    // ---- backup -----------------------------------------------------------------------
+
+    /** Encrypted vault rows + files for a backup. The vault key goes in wrapped by [password]. */
+    class BackupPart(
+        val key: VaultKeyRec,
+        val items: List<VaultItemRec>,
+        val attachments: List<VaultAttachmentRec>,
+        val files: Map<String, java.io.File>,
+    )
+
+    suspend fun backupPart(password: CharArray): BackupPart = withContext(Dispatchers.Default) {
+        withKey { key ->
+            val b64 = Base64.getEncoder()
+            val atts = dao.allAttachments().filter { files.file(it.fileName).isFile }
+            BackupPart(
+                key = VaultBackupKey.wrap(key, password),
+                items = dao.allItems().map { VaultItemRec(it.id, b64.encodeToString(it.payload), it.createdAt, it.updatedAt) },
+                attachments = atts.map { VaultAttachmentRec(it.id, it.itemId, it.fileName, b64.encodeToString(it.payload), it.createdAt) },
+                files = atts.associate { it.fileName to files.file(it.fileName) },
+            )
+        }
+    }
+
+    /**
+     * Adds the vault notes from a backup to this phone's vault (which must exist and be unlocked).
+     * Everything is re-encrypted with this vault's key. Notes already present are skipped.
+     * Returns the number of notes added.
+     */
+    suspend fun restoreFromBackup(
+        items: List<VaultItemRec>,
+        attachments: List<VaultAttachmentRec>,
+        keyRec: VaultKeyRec,
+        password: CharArray,
+        stagedFile: (String) -> java.io.File?,
+    ): Result<Int> = withContext(Dispatchers.Default) {
+        runCatching {
+            if (_isSetUp.value != true) error("Set up the vault on this phone first, then restore again.")
+            val backupKey = VaultBackupKey.unwrap(keyRec, password) ?: error("Wrong backup password.")
+            try {
+                val b64 = Base64.getDecoder()
+                withKey { key ->
+                    var added = 0
+                    items.forEach { item ->
+                        val plain = VaultCrypto.open(backupKey, b64.decode(item.payload), VaultCodec.aadNote(item.id))
+                        val existing = dao.getItem(item.id)
+                        if (existing != null && runCatching { VaultCrypto.open(key, existing.payload, VaultCodec.aadNote(item.id)) }.getOrNull()?.contentEquals(plain) == true) {
+                            return@forEach // same note already here
+                        }
+                        val newId = if (existing == null) item.id else UUID.randomUUID().toString()
+                        dao.upsertItem(VaultItemEntity(newId, VaultCrypto.seal(key, plain, VaultCodec.aadNote(newId)), item.createdAt, item.updatedAt))
+                        plain.fill(0)
+                        attachments.filter { it.itemId == item.id }.forEach { a ->
+                            val meta = VaultCodec.decodeAttachment(VaultCrypto.open(backupKey, b64.decode(a.payload), VaultCodec.aadAttachment(a.id)))
+                            val source = stagedFile(a.fileName) ?: error("A vault file is missing from the backup.")
+                            val bytes = source.inputStream().buffered().use { VaultCrypto.decryptStreamToBytes(backupKey, it, VaultCodec.aadFile(a.id)) }
+                            try {
+                                insertAttachment(key, newId, bytes.inputStream(), meta.displayName, meta.mimeType)
+                            } finally {
+                                bytes.fill(0)
+                            }
+                        }
+                        added++
+                    }
+                    added
+                }
+            } finally {
+                backupKey.fill(0)
+            }
+        }
     }
 
     // ---- moving -----------------------------------------------------------------------
